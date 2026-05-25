@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,400&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=Syne:wght@700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-syne: 'Syne', sans-serif;
+  
+  --color-purple-core: #7C6AF7;
+  --color-purple-light: #A78BFA;
+  --color-pink-core: #F76A8C;
+  --color-pink-light: #F9A8C9;
+  --color-violet-bridge: #C084FC;
+  --color-cream-base: #FAF7FF;
+  --color-cream-2: #F0EBFF;
+  --color-dark-base: #0A0718;
+  --color-dark-surface: #1C1340;
+  --color-dark-text: #2D2060;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-cream-base);
+  color: var(--color-dark-text);
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.font-serif {
+  font-family: var(--font-serif);
+}
+
+.font-syne {
+  font-family: var(--font-syne);
+}
+
+/* Animations and tweaks */
+@keyframes heartPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.animate-pulse-heart {
+  animation: heartPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes particleUp {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-50px) scale(0.6); opacity: 0; }
+}
+
+.xp-particle {
+  animation: particleUp 0.8s ease-out forwards;
+}

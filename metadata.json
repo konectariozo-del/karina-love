@@ -1,0 +1,6 @@
+{
+  "name": "Karina Love",
+  "description": "App de produtividade gamificado para casais. Pare de pedir. Comece a gamificar.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
