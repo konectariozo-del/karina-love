@@ -94,6 +94,7 @@ const PRESET_TROCAS: TrocaState[] = [
 interface CoupleContextType {
   state: CoupleAppState;
   toggleActor: () => void;
+  setCurrentUserId: (id: string) => void;
   completeTask: (taskId: string) => void;
   addCustomTask: (titulo: string, tag: CategoriaTarefa, responsavel: string, dia: DiaSemana, xp: number) => void;
   proposeTrade: (tarefaId: string, recompensaOferecida: string) => void;
@@ -935,6 +936,7 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       activeDecorationStyle: activeGardenStyle
     },
     toggleActor,
+    setCurrentUserId,
     completeTask,
     addCustomTask,
     proposeTrade,
