@@ -5,20 +5,19 @@
 
 import React, { useState } from "react";
 import { useCouple } from "../context/CoupleContext";
-import { DayOfWeek, TaskCategory, TaskState } from "../types";
+import { DiaSemana, CategoriaTarefa, TarefaState } from "../types";
 import {
   Sparkles,
   Droplet,
   Heart,
   Plus,
   Compass,
-  CheckCircle2,
-  Trash2,
-  AlertCircle,
-  HelpCircle,
+  CheckCircle,
   User,
-  Activity,
-  Smile,
+  Coffee,
+  AlertCircle,
+  TrendingUp,
+  RotateCcw
 } from "lucide-react";
 
 export default function HomeTab() {
@@ -32,30 +31,31 @@ export default function HomeTab() {
     gardenHydration,
     activeGardenStyle,
     activeGarageStyle,
+    resetDatabaseState,
   } = useCouple();
 
-  const { currentUserId, home, users, tasks } = state;
-  const activeUser = currentUserId === "karina-id" ? users.ela : users.ele;
-  const partnerUser = currentUserId === "karina-id" ? users.ele : users.ela;
+  const { currentUserId, casal, usuarios, tarefas, rituais } = state;
+  const activeUser = currentUserId === "karina-id" ? usuarios.ela : usuarios.ele;
+  const partnerUser = currentUserId === "karina-id" ? usuarios.ele : usuarios.ela;
 
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>("segunda");
+  const [selectedDia, setSelectedDia] = useState<DiaSemana>("Seg");
   const [showAddTask, setShowAddTask] = useState(false);
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskCategory, setNewTaskCategory] = useState<TaskCategory>("casa");
+  const [newTaskCategory, setNewTaskCategory] = useState<CategoriaTarefa>("Casa");
   const [newTaskAssignee, setNewTaskAssignee] = useState<string>("karina-id");
   const [newTaskXp, setNewTaskXp] = useState<number>(30);
 
   // Filter tasks for the selected weekday
-  const dailyTasks = tasks.filter((t) => t.dayOfWeek === selectedDay);
+  const dailyTasks = tarefas.filter((t) => t.dia === selectedDia);
 
-  const days: { key: DayOfWeek; label: string }[] = [
-    { key: "segunda", label: "Seg" },
-    { key: "terca", label: "Ter" },
-    { key: "quarta", label: "Qua" },
-    { key: "quinta", label: "Qui" },
-    { key: "sexta", label: "Sex" },
-    { key: "sabado", label: "Sáb" },
-    { key: "domingo", label: "Dom" },
+  const dias: { key: DiaSemana; label: string }[] = [
+    { key: "Seg", label: "Seg" },
+    { key: "Ter", label: "Ter" },
+    { key: "Qua", label: "Qua" },
+    { key: "Qui", label: "Qui" },
+    { key: "Sex", label: "Sex" },
+    { key: "Sab", label: "Sáb" },
+    { key: "Dom", label: "Dom" },
   ];
 
   const handleCreateTask = (e: React.FormEvent) => {
@@ -65,471 +65,407 @@ export default function HomeTab() {
       newTaskTitle,
       newTaskCategory,
       newTaskAssignee,
-      selectedDay,
+      selectedDia,
       newTaskXp
     );
     setNewTaskTitle("");
     setShowAddTask(false);
   };
 
-  // Compute terrain level descriptions and styles
+  // Find high priority "Destaque do Dia" task (first incomplete task for the select weekday, or any uncompleted task)
+  const heroTask = tarefas.find(t => !t.concluida && t.responsavel === currentUserId) || tarefas.find(t => !t.concluida);
+
+  // Compute terrain levels
   const getTerrainDetails = (level: number) => {
     switch (level) {
       case 1:
         return {
-          title: "Terreno Inicial Baldo",
-          description: "Nível 1 — Comecem a regar e a construir!",
-          colorClass: "bg-amber-100/60 border-amber-200",
+          title: "Semente de Estrelas 🌱",
+          description: "Vocês estão no Nível 1 — O amor está semeando raízes na terra fértil.",
+          colorClass: "bg-amber-50/50 border-amber-100",
         };
       case 2:
         return {
-          title: "Casa Básica e Grama Inicial",
-          description: "Nível 2 — A horta começou a brotar!",
-          colorClass: "bg-emerald-50/75 border-emerald-100",
+          title: "Florescer Inicial 🌸",
+          description: "Nível 2 — A horta começou a brotar e as decorações do terreno brotam!",
+          colorClass: "bg-emerald-50/50 border-emerald-100",
         };
       case 3:
         return {
-          title: "Telhado, Janelas e Horta Vigorosa",
-          description: "Nível 3 — As flores estão perfumando o ar.",
-          colorClass: "bg-indigo-50/70 border-indigo-100",
+          title: "Constelação Vigorosa 🌌",
+          description: "Nível 3 — A garagem de jogos e a estufa perfumada expandiram.",
+          colorClass: "bg-indigo-50/50 border-indigo-100",
         };
       case 4:
         return {
-          title: "Setup de Games, Churrasqueira e Oficina",
-          description: "Nível 4 — A garagem está quase completa!",
-          colorClass: "bg-purple-50/70 border-purple-100",
+          title: "Parque das Camélias 🎡",
+          description: "Nível 4 — Area de churrasco premium ativa e o pet Pipoca está no auge!",
+          colorClass: "bg-purple-50/50 border-purple-100",
         };
       default:
         return {
-          title: "Piscina e Mansão dos Sonhos",
-          description: "Nível 5 — Área premium de lazer desbloqueada!",
-          colorClass: "bg-pink-50/60 border-pink-100",
+          title: "Castelo de Sonhos Cósmicos 🏰✨",
+          description: "Nível 5 — Área premium de lazer desbloqueada! Vocês alcançaram a harmonia plena.",
+          colorClass: "bg-pink-50/50 border-pink-100",
         };
     }
   };
 
-  const terrainInfo = getTerrainDetails(home.terrainLevel);
-
-  // Generate particle coordinate arrays for visual appeal
-  const renderFlowers = () => {
-    const flowerCount = home.terrainLevel * 3;
-    const colors = ["bg-pink-400", "bg-rose-400", "bg-purple-400", "bg-amber-400"];
-    const styles = [
-      activeGardenStyle === "garden-spring" ? "scale-125 shadow-pink-200 shadow-md" : "",
-      activeGardenStyle === "garden-winter" ? "bg-cyan-200 opacity-60 border-white border text-white" : "",
-    ];
-    
-    return Array.from({ length: flowerCount }).map((_, i) => {
-      const top = (15 + (i * 27) % 65) + "%";
-      const left = (10 + (i * 31) % 75) + "%";
-      const color = colors[i % colors.length];
-      return (
-        <span
-          key={`flower-${i}`}
-          className={`absolute w-3 h-3 rounded-full ${color} animate-pulse ${styles[i % styles.length]}`}
-          style={{ top, left, zIndex: 10 }}
-        >
-          <span className="absolute -inset-0.5 rounded-full border border-white opacity-40"></span>
-        </span>
-      );
-    });
-  };
-
-  const renderGarageTools = () => {
-    const gearCount = home.terrainLevel * 2;
-    const colors = ["bg-slate-400", "bg-zinc-600", "bg-yellow-500", "bg-blue-400"];
-    return Array.from({ length: gearCount }).map((_, i) => {
-      const top = (20 + (i * 23) % 60) + "%";
-      const right = (10 + (i * 37) % 75) + "%";
-      const color = colors[i % colors.length];
-      return (
-        <span
-          key={`gear-${i}`}
-          className={`absolute w-3.5 h-3.5 rounded ${color} opacity-80`}
-          style={{ top, right, zIndex: 10 }}
-        >
-          <span className="block text-[6px] font-bold text-white text-center">⚙️</span>
-        </span>
-      );
-    });
-  };
+  const terrainInfo = getTerrainDetails(casal.nivelTerreno);
 
   return (
     <div className="space-y-6" id="home_tab_container">
-      {/* Dynamic Header Badge */}
-      <div className="p-4 bg-white rounded-3xl border border-[#FAF7FF] shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4" id="streak_status_card">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-orange-50 flex items-center justify-center border border-orange-100 animate-pulse-heart">
-            <span className="text-2xl">🔥</span>
+      
+      {/* 🏡 EMOTIONAL HEADER & STREAK (PASSO 3 — Clean & Elegant) */}
+      <div className="bg-white p-5 rounded-[22px] border border-[#F0EBFF] shadow-[0_2px_16px_rgba(0,0,0,0.04)] space-y-4" id="emotional_header">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[#F9A8C9]/35 flex items-center justify-center animate-pulse-heart">
+              <span className="text-2xl text-[#F76A8C]">🔥</span>
+            </div>
+            <div>
+              <h2 className="font-serif font-semibold text-xl text-[#2D2060]">
+                Sintonia de Casal
+              </h2>
+              <p className="text-gray text-xs">
+                {casal.streakAtual} dias de conexão consecutivos!
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-syne font-extrabold text-lg text-[#2D2060]">
-              Streak de {home.streak} Dias!
-            </h3>
-            <p className="text-xs text-gray-500">
-              {currentUserId === "karina-id" 
-                ? "Seu esforço foi visto hoje ✨ continue alimentando o jardim!"
-                : "Sua parceira fez 2 missões hoje. Você tá perdendo! 👀"}
-            </p>
-          </div>
+          
+          {/* Interactive reset state button (Simulator helper) */}
+          <button 
+            onClick={resetDatabaseState}
+            className="p-1.5 text-gray hover:text-[#7C6AF7] rounded-lg hover:bg-[#F0EBFF] transition"
+            title="Redefinir simulador"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
         </div>
-        
-        {/* Terrain Level Badge with Ring */}
-        <div className="flex items-center gap-2 bg-[#FAF7FF] px-4 py-2 rounded-2xl border border-[#F0EBFF]">
-          <Compass className="w-5 h-5 text-[#8b5cf6]" />
-          <span className="text-xs font-semibold text-[#2D2060]">
-            Nível do Terreno: <b className="text-[#7C6AF7] text-sm font-syne">{home.terrainLevel}</b>
-          </span>
-          <div className="w-12 bg-gray-200 rounded-full h-1.5 ml-2 overflow-hidden">
+
+        {/* ProgressBar Terreno */}
+        <div className="pt-2">
+          <div className="flex justify-between items-center mb-1 text-xs text-[#2D2060]">
+            <span className="font-syne font-semibold flex items-center gap-1">
+              <Compass className="w-3.5 h-3.5 text-[#7C6AF7]" /> Nível do Terreno: <span className="text-[#7C6AF7]">{casal.nivelTerreno}</span>
+            </span>
+            <span className="font-syne font-bold text-[11px]">{(casal.xpCasal % 500)} / 500 XP</span>
+          </div>
+          <div className="w-full bg-[#F0EBFF] h-2.5 rounded-full overflow-hidden">
             <div 
-              className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
-              style={{ width: `${(home.terrainXp % 500) / 5}%` }}
+              className="bg-gradient-to-r from-[#7C6AF7] to-[#C084FC] h-2.5 rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, (casal.xpCasal % 500) / 5)}%` }}
             ></div>
           </div>
-          <span className="text-[10px] font-mono text-gray-400">{(home.terrainXp % 500)}/500 XP</span>
         </div>
       </div>
 
-      {/* VIRTUAL TERRAIN BOARD */}
-      <div className={`p-6 rounded-3xl border ${terrainInfo.colorClass} shadow-md overflow-hidden relative min-h-[340px] flex flex-col justify-between`} id="terrain_visualizer">
-        {/* Background Starry Overlay */}
-        <div className="absolute inset-0 opacity-15 pointer-events-none text-indigo-900 font-serif text-[10px] tracking-widest leading-loose">
-          ✦   *      ✧   .     *  ✦   ✧
-            .   ✦   .  *      *   .     ✧
-        </div>
+      {/* ⚡ DESTAQUE DO DIA (PASSO 3 — One Single Action in Spotlight) */}
+      <div className="bg-gradient-to-br from-[#1C1340] to-[#0A0718] text-white p-6 rounded-[22px] shadow-[0_4px_20px_rgba(28,19,64,0.15)] relative overflow-hidden" id="daily_highlight">
+        <div className="absolute top-0 right-0 p-4 opacity-10 font-serif text-5xl">✦</div>
         
-        {/* Cosmic Theme Decor for higher levels */}
-        {home.terrainLevel >= 4 && (
-          <div className="absolute -top-12 -right-12 w-28 h-28 bg-[#C084FC]/25 rounded-full blur-2xl pointer-events-none"></div>
-        )}
-
-        {/* Home Level Label Banner */}
-        <div className="z-10 bg-white/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-gray-100 shadow-sm inline-flex items-center gap-2 self-start">
-          <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
-          <span className="text-xs font-syne font-extrabold text-[#2D2060]">
-            {terrainInfo.title}
+        <div className="space-y-3 relative z-10">
+          <span className="inline-block bg-[#F76A8C] text-[9px] font-bold text-white tracking-widest uppercase px-2.5 py-0.5 rounded-full">
+            Missão Especial do Dia ⭐
           </span>
+          
+          {heroTask ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="font-serif text-2xl font-semibold leading-snug text-[#FAF7FF]">
+                  {heroTask.titulo}
+                </h3>
+                <p className="text-xs text-purple-light mt-1">
+                  Atribuída a: <b className="text-[#F9A8C9]">{heroTask.responsavel === "karina-id" ? "Karina" : "Yuri"}</b>
+                </p>
+              </div>
+
+              <div className="flex justify-between items-center">
+                <div className="font-syne text-[#F9A8C9] font-black text-sm">
+                  +{heroTask.xp} XP de União
+                </div>
+                
+                {heroTask.responsavel === currentUserId ? (
+                  <button
+                    onClick={() => completeTask(heroTask.id)}
+                    className="bg-gradient-to-r from-[#7C6AF7] to-[#A78BFA] hover:opacity-95 text-white text-xs font-bold py-2 px-4 rounded-xl shadow-md transition-all active:scale-95 cursor-pointer"
+                  >
+                    Concluir Agora ✓
+                  </button>
+                ) : (
+                  <span className="text-xs text-indigo-200 italic">Parceiro agindo...</span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 py-2">
+              <h3 className="font-serif text-lg text-cream">Todas as obrigações feitas! 🎉</h3>
+              <p className="text-xs text-indigo-150">Que tal criar momentos especiais na aba de Rituais ou dar uma passada nos mimos?</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 🏠 VISUAL TERRAIN (PASSO 3 — Separated Custom Section) */}
+      <div className={`p-6 rounded-[22px] border ${terrainInfo.colorClass} shadow-[0_2px_16px_rgba(0,0,0,0.03)] space-y-4 relative`} id="sandbox_terrain_view">
+        <div className="flex justify-between items-center border-b border-[#F0EBFF]/60 pb-2">
+          <div>
+            <span className="text-[10px] font-bold text-[#7C6AF7] tracking-widest uppercase block">Seu Pedacinho Cósmico</span>
+            <h3 className="font-serif font-bold text-xl text-[#2D2060]">
+              {terrainInfo.title}
+            </h3>
+          </div>
+          <span className="text-xs font-syne font-bold text-gray">{terrainInfo.description}</span>
         </div>
 
-        {/* Divided Visual Scene */}
-        <div className="flex flex-col md:flex-row gap-6 items-stretch justify-between relative py-6 z-10">
+        {/* Visual elements */}
+        <div className="grid grid-cols-2 gap-4">
           
-          {/* DELA: O Jardim (Left Column) */}
-          <div className="flex-1 min-h-[160px] rounded-2xl bg-white/60 backdrop-blur-sm border border-pink-100 p-4 relative flex flex-col justify-between overflow-hidden">
-            {/* Seasonal background decor */}
-            {activeGardenStyle === "garden-spring" ? (
-              <div className="absolute inset-0 bg-pink-50/40 border-pink-200 border-2 pointer-events-none rounded-xl" />
-            ) : activeGardenStyle === "garden-winter" ? (
-              <div className="absolute inset-0 bg-sky-50/40 border-sky-100 border-2 pointer-events-none rounded-xl" />
-            ) : null}
+          {/* ELA: O Jardim */}
+          <div className="bg-white/85 p-3.5 rounded-2xl border border-[#F0EBFF] relative space-y-3 min-h-[140px] flex flex-col justify-between overflow-hidden">
+            {activeGardenStyle === "garden-spring" && <div className="absolute inset-x-0 bottom-0 bg-pink-100/30 h-10 border-t border-pink-200/50" />}
+            {activeGardenStyle === "garden-winter" && <div className="absolute inset-x-0 bottom-0 bg-sky-100/30 h-10 border-t border-sky-200/50" />}
 
-            <div className="flex justify-between items-center relative z-10 border-b border-pink-150/40 pb-2">
-              <span className="text-xs font-bold text-pink-600 flex items-center gap-1">
-                🌸 Jardim da {users.ela.displayName}
-              </span>
-              <span className="text-[10px] text-gray-500">Nível {home.terrainLevel >= 3 ? "Florescente 🥕" : "Brotando 🌾"}</span>
+            <div className="relative z-10 flex justify-between items-center">
+              <span className="text-[11px] font-bold text-[#2D2060]">🌸 Jardim da Karina</span>
+              <span className="text-[10px] text-gray">Refúgio</span>
             </div>
 
-            {/* Render Flower Particles based on level */}
-            <div className="relative h-20 w-full my-1">
-              {renderFlowers()}
-              {home.terrainLevel >= 3 && (
-                <div className="absolute bottom-1 left-2 flex gap-1 items-center bg-sand-200 p-1 rounded-md text-[10px]">
-                  <span>🥕</span>
-                  <span>🧅</span>
-                  <span>🥬</span>
-                </div>
-              )}
-              {home.terrainLevel >= 4 && (
-                <div className="absolute top-2 right-2 text-lg">💡</div>
-              )}
+            {/* Simulated interactive flower visualization */}
+            <div className="relative z-10 h-10 text-center flex items-center justify-center gap-1">
+              <span className="text-2xl animate-bounce">✿</span>
+              {casal.nivelTerreno >= 2 && <span className="text-2xl">💮</span>}
+              {casal.nivelTerreno >= 3 && <span className="text-lg">🌸</span>}
+              {casal.nivelTerreno >= 4 && <span className="text-2xl">🌹</span>}
+              {activeGardenStyle === "garden-spring" && <span className="text-xs animate-ping">✨</span>}
             </div>
 
-            <div className="flex justify-between items-center pt-2 relative z-10 border-t border-pink-50">
-              <span className="text-[10px] text-gray-500 font-mono">Hidratação: {gardenHydration}%</span>
-              <button 
+            <div className="relative z-10 flex justify-between items-center border-t border-[#F0EBFF]/70 pt-2 text-[10px]">
+              <span className="font-mono text-gray">Água: {gardenHydration}%</span>
+              <button
                 onClick={waterGarden}
-                className="bg-sky-50 hover:bg-sky-100 text-sky-500 text-xs px-2.5 py-1 rounded-xl border border-sky-100 flex items-center gap-1 transition"
+                className="bg-[#FAF7FF] border border-[#F0EBFF] px-2.5 py-1 rounded-xl text-sky-500 font-bold hover:bg-[#F0EBFF] flex items-center gap-1 transition"
               >
-                <Droplet className="w-3.5 h-3.5 fill-sky-500" />
-                Regar
+                <Droplet className="w-3 h-3 text-sky-500" /> Regar
               </button>
             </div>
           </div>
 
-          {/* VIRTUAL PET IN THE MIDDLE */}
-          <div className="flex flex-col items-center justify-center px-4 self-center relative py-2 min-w-[100px]" id="couple_pet_container">
-            <div className="w-14 h-14 bg-[#FAF7FF] rounded-full border-2 border-[#7C6AF7] flex items-center justify-center shadow-md relative animate-bounce z-10">
-              <span className="text-3xl">🐱</span>
-              <span className="absolute -top-1 -right-1 text-xs">✨</span>
-            </div>
-            <div className="mt-1 bg-white px-2.5 py-0.5 rounded-full border border-[#FAF7FF] shadow-xs z-10 text-center">
-              <p className="text-[9px] font-extrabold text-[#7C6AF7] uppercase tracking-wide">Pipoca (Pet)</p>
-              <p className="text-[8px] text-gray-400">Status: <b className="text-emerald-500">{petStatus}</b></p>
-            </div>
-            <button 
-              onClick={feedPet}
-              className="mt-1.5 bg-[#FAF7FF] hover:bg-pink-50 text-[10px] text-pink-500 border border-pink-100 rounded-full px-2.5 py-0.5"
-            >
-              🐾 Alimentar
-            </button>
-          </div>
+          {/* ELE: A Garagem */}
+          <div className="bg-white/85 p-3.5 rounded-2xl border border-[#F0EBFF] relative space-y-3 min-h-[140px] flex flex-col justify-between overflow-hidden">
+            {activeGarageStyle === "garage-neon" && <div className="absolute inset-x-0 bottom-0 bg-indigo-950/20 h-10 border-t border-purple-500/50" />}
 
-          {/* DELE: A Garagem (Right Column) */}
-          <div className="flex-1 min-h-[160px] rounded-2xl bg-white/60 backdrop-blur-sm border border-purple-100 p-4 relative flex flex-col justify-between overflow-hidden">
-            {/* Style override active style */}
-            {activeGarageStyle === "garage-neon" ? (
-              <div className="absolute inset-0 bg-[#0A0718]/40 border-[#7C6AF7] border-2 pointer-events-none rounded-xl" />
-            ) : null}
-
-            <div className="flex justify-between items-center relative z-10 border-b border-purple-150/40 pb-2">
-              <span className="text-xs font-bold text-[#7C6AF7] flex items-center gap-1">
-                🛠️ Garagem/Oficina do {users.ele.displayName}
-              </span>
-              <span className="text-[10px] text-gray-500">Nível {home.terrainLevel>=4 ? "Setup Gamer 🕹️" : "Oficina 🛠️"}</span>
+            <div className="relative z-10 flex justify-between items-center">
+              <span className="text-[11px] font-bold text-[#2D2060]">🔧 Garagem do Yuri</span>
+              <span className="text-[10px] text-gray">Recanto</span>
             </div>
 
-            {/* Render Gear Particles / BBQ / Game Setup based on level */}
-            <div className="relative h-20 w-full my-1">
-              {renderGarageTools()}
-              {home.terrainLevel >= 3 && (
-                <div className="absolute bottom-1 right-2 text-xl filter drop-shadow animate-pulse" title="Churrasqueira">🍖🔥</div>
-              )}
-              {home.terrainLevel >= 4 && (
-                <div className="absolute top-2 left-2 text-lg">🕹️💻</div>
-              )}
+            {/* Simulated tool objects */}
+            <div className="relative z-10 h-10 text-center flex items-center justify-center gap-1">
+              <span className="text-2xl">🛠️</span>
+              {casal.nivelTerreno >= 3 && <span className="text-xl animate-spin">⚙️</span>}
+              {casal.nivelTerreno >= 4 && <span className="text-2xl">🎮</span>}
+              {activeGarageStyle === "garage-neon" && <span className="text-xs">🕹️</span>}
             </div>
 
-            <div className="flex justify-between items-center pt-2 relative z-10 border-t border-purple-50">
-              <span className="text-[10px] text-gray-500 font-mono">Construções: {home.terrainLevel}/5</span>
-              <span className="text-[10px] bg-slate-150 text-slate-600 px-2.5 py-0.5 rounded-full border border-gray-100 font-medium">
-                {home.terrainLevel >= 4 ? "Setup Gamer ✅" : home.terrainLevel >= 3 ? "Churrasqueira ✅" : "Toda Ativa 🛠️"}
+            <div className="relative z-10 flex justify-between items-center border-t border-[#F0EBFF]/70 pt-2 text-[10px]">
+              <span className="font-mono text-gray-400">Objetos: {casal.nivelTerreno}</span>
+              <span className="text-[9px] uppercase font-bold text-[#7C6AF7] bg-[#F0EBFF] px-2 py-0.5 rounded">
+                Ativo
               </span>
             </div>
           </div>
 
         </div>
 
-        {/* Motivational Quote or Subtext */}
-        <p className="text-center text-[10px] text-gray-500 italic mt-2 z-10">
-          "As conquistas dele liberam as suas decorações, e vice-versa. União é progresso."
-        </p>
-      </div>
-
-      {/* WEEK DAY AGENDA & CHORES CHECKLIST */}
-      <div className="bg-white p-6 rounded-3xl border border-[#F0EBFF] shadow-sm space-y-6" id="tasks_agenda_panel">
-        
-        {/* Header and Add Task */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="font-serif font-bold text-2xl text-[#2d2060]">
-              Agenda da Semana
-            </h3>
-            <p className="text-xs text-gray-500">Selecione o dia para mapear as missões residenciais</p>
+        {/* Pet Pipoca Container */}
+        <div className="bg-white/80 p-3.5 rounded-2xl border border-[#F0EBFF] flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl animate-bounce">🐱</span>
+            <div>
+              <h4 className="font-bold text-xs text-[#2D2060]">Mascote do Casal: Pipoca 🐾</h4>
+              <p className="text-[10px] text-gray mt-0.5">Humor: <span className="text-emerald-500 font-bold">{petStatus}</span></p>
+            </div>
           </div>
           <button
-            onClick={() => setShowAddTask(!showAddTask)}
-            className="bg-[#7C6AF7] hover:bg-[#7C6AF7]/90 text-white rounded-2xl px-4 py-2 text-xs font-semibold flex items-center gap-1.5 transition"
+            onClick={feedPet}
+            className="text-[11px] bg-[#FAF7FF] hover:bg-[#F0EBFF] border border-[#F0EBFF] text-[#F76A8C] font-semibold py-1.5 px-3 rounded-xl transition"
           >
-            <Plus className="w-4 h-4" />
-            Nova Tarefa
+            🍎 Alimentar Pipoca
+          </button>
+        </div>
+      </div>
+
+      {/* 📅 TAREFAS DIÁRIAS (PASSO 3 — Spacious, clean, clear) */}
+      <div className="bg-white p-6 rounded-[22px] border border-[#F0EBFF] shadow-[0_2px_16px_rgba(0,0,0,0.04)] space-y-5" id="daily_chores_section">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="font-serif font-bold text-xl text-[#2D2060]">
+              Obrigações e Carinhos
+            </h3>
+            <p className="text-xs text-gray mt-1">Checklist semanal com atribuição por parceiro</p>
+          </div>
+          
+          <button
+            onClick={() => setShowAddTask(!showAddTask)}
+            className="bg-[#7C6AF7] hover:bg-[#7C6AF7]/95 text-white font-bold text-xs rounded-xl py-2 px-3.5 flex items-center gap-1 transition shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Adicionar
           </button>
         </div>
 
-        {/* Day Selector Buttons */}
-        <div className="flex overflow-x-auto gap-2 pb-2 no-scrollbar" id="day_scroller">
-          {days.map((day) => {
-            const isSelected = selectedDay === day.key;
+        {/* Days of Week Tab Buttons */}
+        <div className="flex justify-between items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          {dias.map((d) => {
+            const isSelected = selectedDia === d.key;
+            const undoneCount = tarefas.filter(t => t.dia === d.key && !t.concluida).length;
             
-            // Check count of incomplete tasks for this day
-            const taskOnDay = tasks.filter((t) => t.dayOfWeek === day.key);
-            const pendingCount = taskOnDay.filter((t) => !t.completed).length;
-
             return (
               <button
-                key={`day-${day.key}`}
-                onClick={() => setSelectedDay(day.key)}
-                className={`px-4 py-2.5 rounded-2xl border text-xs font-bold transition flex items-center gap-1 relative ${
+                key={d.key}
+                onClick={() => setSelectedDia(d.key)}
+                className={`py-2 px-3.5 rounded-xl border font-bold text-xs transition relative flex-1 text-center select-none cursor-pointer ${
                   isSelected
-                    ? "bg-[#2D2060] text-white border-[#2D2060] shadow-md"
+                    ? "bg-[#7C6AF7] text-white border-[#7C6AF7]"
                     : "bg-[#FAF7FF] text-[#2D2060] border-[#F0EBFF] hover:bg-[#F0EBFF]"
                 }`}
               >
-                {day.label}
-                {pendingCount > 0 && (
-                  <span className={`w-2 h-2 rounded-full absolute top-1 right-1 ${isSelected ? "bg-pink-400" : "bg-[#7C6AF7]"}`}></span>
+                <span>{d.label}</span>
+                {undoneCount > 0 && (
+                  <span className={`absolute top-1 right-1 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#F76A8C]'}`} />
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* New Task Inline Form Container */}
+        {/* Add custom chore form */}
         {showAddTask && (
-          <form onSubmit={handleCreateTask} className="p-4 bg-[#FAF7FF] rounded-2xl border border-[#F0EBFF] space-y-3 animate-fade-in">
-            <h4 className="text-xs font-bold text-[#2D2060] uppercase tracking-wider">Registrar Nova Missão Gamificada</h4>
+          <form onSubmit={handleCreateTask} className="p-4 bg-[#FAF7FF] rounded-2xl border border-[#F0EBFF] space-y-3">
+            <h4 className="text-xs font-bold text-[#2D2060] tracking-wider uppercase">Cadastrar Tarefa para a {selectedDia}</h4>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2.5">
               <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Nome da Tarefa</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Tirar o lixoReciclável, Pagar o gás"
+                  placeholder="Ex: Pagar a internet, lavar os banheiros..."
                   value={newTaskTitle}
                   onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none focus:border-[#7C6AF7]"
+                  className="w-full bg-white border border-[#E5E7EB] rounded-xl py-2 px-3 text-xs text-[#2D2060] outline-none animate-fade-in"
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Responsável</label>
-                <select
-                  value={newTaskAssignee}
-                  onChange={(e) => setNewTaskAssignee(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
-                >
-                  <option value="karina-id">Karina (Ela)</option>
-                  <option value="yuri-id">Yuri (Ele)</option>
-                </select>
-              </div>
-            </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="block text-[9px] text-gray uppercase font-bold mb-0.5">Responsável</label>
+                  <select
+                    value={newTaskAssignee}
+                    onChange={(e) => setNewTaskAssignee(e.target.value)}
+                    className="w-full bg-white border border-[#E5E7EB] rounded-xl py-2 px-3 text-xs text-gray"
+                  >
+                    <option value="karina-id">Karina (Ela)</option>
+                    <option value="yuri-id">Yuri (Ele)</option>
+                  </select>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Categoria de Tag</label>
-                <select
-                  value={newTaskCategory}
-                  onChange={(e) => setNewTaskCategory(e.target.value as TaskCategory)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
-                >
-                  <option value="casa">🏠 Casa / Limpeza</option>
-                  <option value="compras">🛒 Compras / Logística</option>
-                  <option value="financeiro">💰 Financeiro / Contas</option>
-                  <option value="outro">✨ Outros Afetivos</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Recompensa (Valor XP)</label>
-                <input
-                  type="number"
-                  min="10"
-                  max="150"
-                  value={newTaskXp}
-                  onChange={(e) => setNewTaskXp(Number(e.target.value))}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
-                />
+                <div>
+                  <label className="block text-[9px] text-gray uppercase font-bold mb-0.5">Tag de Categoria</label>
+                  <select
+                    value={newTaskCategory}
+                    onChange={(e) => setNewTaskCategory(e.target.value as CategoriaTarefa)}
+                    className="w-full bg-white border border-[#E5E7EB] rounded-xl py-2 px-3 text-xs text-gray"
+                  >
+                    <option value="Casa">🏠 Casa</option>
+                    <option value="Compras">🛒 Compras</option>
+                    <option value="Financeiro">💰 Financeiro</option>
+                    <option value="Outro">✨ Outro</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="flex items-end gap-2">
+              <div className="flex gap-2">
                 <button
                   type="submit"
-                  className="flex-1 bg-[#F76A8C] text-white hover:bg-[#F76A8C]/90 rounded-xl py-2 px-4 font-bold text-xs transition"
+                  className="flex-1 bg-[#F76A8C] hover:bg-[#F76A8C]/95 text-white text-xs font-bold py-2 rounded-xl transition"
                 >
-                  Confirmar
+                  Criar Tarefa
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddTask(false)}
-                  className="text-xs text-gray-400 hover:text-gray-600 p-2"
+                  className="border border-gray-150 py-2 px-4 rounded-xl text-xs"
                 >
-                  Cancelar
+                  Fechar
                 </button>
               </div>
             </div>
           </form>
         )}
 
-        {/* Chores Checklist */}
-        <div className="space-y-3" id="agenda_tasks_list">
+        {/* Tasks Checklist */}
+        <div className="space-y-2.5">
           {dailyTasks.length === 0 ? (
-            <div className="text-center py-6 border border-dashed border-gray-200 rounded-2xl bg-gray-50">
-              <span className="text-2xl block mb-1">🍿</span>
-              <p className="text-xs text-gray-400 font-medium">Nenhuma tarefa pendente para esta {selectedDay}!</p>
-              <p className="text-[10px] text-gray-400 italic">Espaço livre para focar inteiramente em rituais.</p>
+            <div className="p-6 bg-[#FAF7FF] rounded-2xl border border-[#F0EBFF] text-center">
+              <span className="text-xl">☕</span>
+              <p className="text-xs text-gray font-medium mt-1">Tudo em paz! Nenhuma missão cadastrada para esta {selectedDia}.</p>
             </div>
           ) : (
-            dailyTasks.map((task) => {
-              const isOwner = task.assigneeId === currentUserId;
-              const assigneeName = task.assigneeId === "karina-id" ? "Karina" : "Yuri";
-              
-              // Color tags
-              const categoryEmojis: Record<TaskCategory, string> = {
-                casa: "🏠",
-                compras: "🛒",
-                financeiro: "💰",
-                outro: "✨",
-              };
+            dailyTasks.map((t) => {
+              const isMine = t.responsavel === currentUserId;
+              const assignName = t.responsavel === "karina-id" ? "Karina" : "Yuri";
 
               return (
                 <div
-                  key={task.id}
-                  className={`flex justify-between items-center p-3.5 rounded-2xl border transition ${
-                    task.completed
-                      ? "bg-gray-50/60 border-gray-100 opacity-65"
-                      : "bg-white border-[#F0EBFF] hover:border-violet-100 hover:shadow-xs"
+                  key={t.id}
+                  className={`p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                    t.concluida
+                      ? "bg-gray-50/50 border-gray-100 opacity-60"
+                      : "bg-white border-[#F0EBFF] hover:border-[#7C6AF7]/20 shadow-xs"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    {/* Tick Button */}
                     <button
-                      onClick={() => completeTask(task.id)}
-                      disabled={task.completed}
-                      className={`w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${
-                        task.completed
-                          ? "bg-emerald-500 border-emerald-500 text-white cursor-not-allowed"
-                          : isOwner
+                      onClick={() => completeTask(t.id)}
+                      disabled={t.concluida || !isMine}
+                      className={`w-6 h-6 rounded-full border flex items-center justify-center transition ${
+                        t.concluida
+                          ? "bg-emerald-500 border-emerald-500 text-white"
+                          : isMine
                           ? "border-[#7C6AF7] hover:bg-[#7C6AF7]/10"
-                          : "border-gray-200 cursor-not-allowed"
+                          : "border-gray-light bg-[#FAF7FF]"
                       }`}
-                      title={isOwner ? "Clique para concluir tarefa" : `Tarefa delegada ao parceiro`}
                     >
-                      {task.completed ? (
-                        <span className="text-xs">✓</span>
-                      ) : isOwner ? (
-                        <span className="text-[#7C6AF7] text-[10px] opacity-0 hover:opacity-100 font-black">✓</span>
-                      ) : null}
+                      {t.concluida && <span className="text-[10px] font-bold">✓</span>}
                     </button>
 
                     <div>
-                      <p className={`text-xs font-bold ${task.completed ? "line-through text-gray-400" : "text-[#2D2060]"}`}>
-                        {task.title}
-                      </p>
-                      
-                      {/* Meta Information Tags */}
+                      <h4 className={`text-xs font-bold ${t.concluida ? "line-through text-gray" : "text-[#2D2060]"}`}>
+                        {t.titulo}
+                      </h4>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[9px] bg-gray-100 px-1.5 py-0.5 rounded-md text-gray-500 uppercase font-mono font-bold tracking-wider">
-                          {categoryEmojis[task.category]} {task.category}
+                        <span className="text-[9px] bg-[#FAF7FF] px-1.5 py-0.5 rounded text-gray uppercase font-mono tracking-wider font-bold">
+                          {t.tag}
                         </span>
-                        
-                        <span className={`text-[9px] px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                          task.assigneeId === "karina-id" 
-                            ? "bg-pink-50 border-pink-100 text-pink-500 font-bold" 
-                            : "bg-purple-50 border-purple-100 text-[#7C6AF7] font-bold"
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full border ${
+                          t.responsavel === "karina-id" 
+                            ? "bg-pink-50 border-[#F9A8C9]/30 text-[#F76A8C]" 
+                            : "bg-[#FAF7FF] border-[#F0EBFF] text-[#7C6AF7]"
                         }`}>
-                          <User className="w-2.5 h-2.5" />
-                          {assigneeName} {isOwner && "(Você)"}
+                          {assignName}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* XP Value Reward display */}
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-xs font-syne font-extrabold text-[#7C6AF7] bg-[#F0EBFF] px-2.5 py-1 rounded-xl">
-                      +{task.xpValue} XP
-                    </span>
-                    {!isOwner && !task.completed && (
-                      <span className="text-[8px] text-pink-500 italic">Troca de tarefa disponível</span>
-                    )}
-                  </div>
+                  <span className="text-xs font-syne font-semibold text-[#7C6AF7]">
+                    +{t.xp} XP
+                  </span>
                 </div>
               );
             })
           )}
         </div>
-
       </div>
 
     </div>

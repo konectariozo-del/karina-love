@@ -5,6 +5,7 @@
 
 import React, { useState } from "react";
 import { useCouple } from "../context/CoupleContext";
+import { CategoriaTarefa } from "../types";
 import { Gift, RefreshCw, Plus, Check, X, ShieldAlert, BadgeInfo } from "lucide-react";
 
 export default function RecompensasTab() {
@@ -16,11 +17,11 @@ export default function RecompensasTab() {
     respondToTrade,
   } = useCouple();
 
-  const { currentUserId, rewards, tasks, proposals, users } = state;
+  const { currentUserId, recompensas, tarefas, trocas, usuarios } = state;
 
   const isEla = currentUserId === "karina-id";
-  const userObj = isEla ? users.ela : users.ele;
-  const partnerObj = isEla ? users.ele : users.ela;
+  const userObj = isEla ? usuarios.ela : usuarios.ele;
+  const partnerObj = isEla ? usuarios.ele : usuarios.ela;
 
   // Form states
   const [showAddReward, setShowAddReward] = useState(false);
@@ -30,7 +31,7 @@ export default function RecompensasTab() {
   // Proposal Form states
   const [showProposeTrade, setShowProposeTrade] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string>("");
-  const [selectedRewardId, setSelectedRewardId] = useState<string>("");
+  const [swapOfferedReward, setSwapOfferedReward] = useState<string>("");
 
   const handleCreateReward = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,263 +43,242 @@ export default function RecompensasTab() {
 
   const handleSendProposal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedTaskId || !selectedRewardId) return;
-    proposeTrade(selectedTaskId, selectedRewardId);
+    if (!selectedTaskId || !swapOfferedReward.trim()) return;
+    proposeTrade(selectedTaskId, swapOfferedReward);
     setSelectedTaskId("");
-    setSelectedRewardId("");
+    setSwapOfferedReward("");
     setShowProposeTrade(false);
   };
 
   // Filter tasks belonging only to the other partner that are not completed yet
-  const partnerIncompleteTasks = tasks.filter(
-    (t) => t.assigneeId === partnerObj.id && !t.completed
+  const partnerIncompleteTasks = tarefas.filter(
+    (t) => t.responsavel === partnerObj.id && !t.concluida
   );
 
-  // Filter rewards configured by me (current active user)
-  const myRewards = rewards.filter((r) => r.assigneeId === currentUserId);
-  const partnerRewards = rewards.filter((r) => r.assigneeId !== currentUserId);
+  // Filter rewards configured by me (current active user) vs partner
+  const myRewards = recompensas.filter((r) => r.configuradaPor === currentUserId && !r.resgatada);
+  const partnerRewards = recompensas.filter((r) => r.configuradaPor !== currentUserId && !r.resgatada);
+  const claimedRewards = recompensas.filter((r) => r.resgatada);
 
   // Active proposals sent to me from my partner
-  const incomingProposals = proposals.filter(
-    (p) => p.receiverId === currentUserId && p.status === "pending"
+  const incomingProposals = trocas.filter(
+    (p) => p.proponenteId !== currentUserId && p.status === "pendente"
   );
 
   // Outgoing pending proposals
-  const outgoingProposals = proposals.filter(
-    (p) => p.proposerId === currentUserId && p.status === "pending"
+  const outgoingProposals = trocas.filter(
+    (p) => p.proponenteId === currentUserId && p.status === "pendente"
   );
 
   return (
     <div className="space-y-6" id="rewards_tab_container">
       
-      {/* Top Banner introducing XP currency status */}
-      <div className="bg-gradient-to-r from-[#7C6AF7] to-[#C084FC] p-6 rounded-3xl text-white flex justify-between items-center shadow-md">
+      {/* 💳 REWARDS XP WALLET BAND */}
+      <div className="bg-gradient-to-br from-[#1C1340] to-[#0A0718] p-6 rounded-[22px] text-white flex justify-between items-center shadow-[0_4px_20px_rgba(28,19,64,0.12)]">
         <div className="space-y-1">
-          <span className="text-[10px] bg-white/20 px-2.5 py-0.5 rounded-full font-mono font-bold uppercase tracking-wide">
-            Carteira Espacial de Pontos
+          <span className="text-[9px] bg-white/10 text-pink-300 font-bold uppercase py-0.5 px-2.5 rounded-full tracking-wider">
+            Carteira da Sintonia
           </span>
-          <h3 className="font-serif font-bold text-2xl">
-            Suas Moedas de Progresso
+          <h3 className="font-serif font-bold text-2xl text-cream">
+            Pontuações Individuais
           </h3>
-          <p className="text-xs text-indigo-100 italic">
-            Acumule XP concluindo obrigações para sacar mimos merecidos.
+          <p className="text-xs text-purple-light italic">
+            Acumule pontos em tarefas para cobrar chamegos e mimos especiais.
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[10px] text-indigo-150 uppercase tracking-wide font-medium">Seu XP Disponível</p>
-          <p className="text-4xl font-syne font-black text-pink-300">
-            {userObj.xp} <span className="text-sm font-sans font-medium text-white">XP</span>
+          <p className="text-[10px] text-purple-light uppercase tracking-widest font-semibold">Seu XP Individual</p>
+          <p className="text-4xl font-syne font-black text-[#F76A8C]">
+            {userObj.xpIndividual} <span className="text-xs font-sans font-semibold text-white">XP</span>
           </p>
-          <p className="text-[9px] text-indigo-100">{userObj.displayName} ({userObj.badge})</p>
+          <p className="text-[9px] text-zinc-300 font-medium">{userObj.nome} (Ativo)</p>
         </div>
       </div>
 
-      {/* DETALHE TROCAS NEGOCIADAS (Chore swapping panel) */}
-      <div className="bg-white p-6 rounded-3xl border border-[#F0EBFF] shadow-sm space-y-4" id="negotiated_trade_hub">
-        
-        <div className="flex justify-between items-center">
+      {/* 🔄 TROCAS E ACORDOS (Swapping chores dashboard) */}
+      <div className="bg-white p-5 rounded-[22px] border border-[#F0EBFF] shadow-[0_2px_16px_rgba(0,0,0,0.04)] space-y-4" id="chore_swapping_station">
+        <div className="flex justify-between items-center pb-1">
           <div>
-            <h3 className="font-serif font-bold text-2xl text-[#2D2060]">
-              Trocas Negociadas 🔄
+            <h3 className="font-serif font-bold text-xl text-[#2D2060]">
+              Acordo de Cavalheiros 🤝
             </h3>
-            <p className="text-xs text-gray-550">
-              Pare de cobrar! Se a tarefa do outro estiver pesando, proponha assumi-la em troca de um prêmio.
-            </p>
+            <p className="text-xs text-gray">Se a tarefa do outro estiver pesando, proponha fazê-la em troca de um agrado!</p>
           </div>
           <button
             onClick={() => setShowProposeTrade(!showProposeTrade)}
-            className="bg-yellow-500 hover:bg-yellow-650 text-[#0A0718] text-xs font-bold rounded-xl px-4 py-2 transition flex items-center gap-1"
+            className="bg-[#C084FC] hover:bg-[#C084FC]/95 text-[#0A0718] font-bold text-xs px-3.5 py-2 rounded-xl transition flex items-center gap-1 cursor-pointer"
           >
-            <RefreshCw className="w-3.5 h-3.5" />
-            Propor Troca
+            <RefreshCw className="w-3.5 h-3.5" /> Propor Acordo
           </button>
         </div>
 
-        {/* Propose trade inline workflow */}
+        {/* Swapping inline proposal builder */}
         {showProposeTrade && (
-          <form onSubmit={handleSendProposal} className="p-4 bg-yellow-50/70 border border-yellow-200 rounded-2xl space-y-3">
-            <h4 className="text-xs font-extrabold text-[#2D2060] uppercase tracking-wider flex items-center gap-1">
-              <BadgeInfo className="w-4 h-4 text-yellow-500" />
-              Lançar Acordo de Cooperação
+          <form onSubmit={handleSendProposal} className="p-4 bg-[#FAF7FF] border border-[#F0EBFF] rounded-2xl space-y-3">
+            <h4 className="text-xs font-bold text-[#2D2060] uppercase tracking-wider flex items-center gap-1">
+              <BadgeInfo className="w-4 h-4 text-[#7C6AF7]" /> Propor Nova Troca Cooperativa
             </h4>
 
             {partnerIncompleteTasks.length === 0 ? (
-              <p className="text-xs text-gray-500 bg-white p-3 rounded-xl border border-dashed border-gray-200">
-                Seu parceiro não tem nenhuma tarefa pendente para você negociar! Bom trabalho para os dois. ✨
+              <p className="text-xs text-gray italic bg-white p-3 rounded-xl border border-dashed border-[#F0EBFF]">
+                Seu parceiro não tem obrigações pendentes hoje para você negociar! ✨
               </p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+              <div className="space-y-2.5">
                 <div>
-                  <label className="block text-[10px] text-[#2D2060] font-bold mb-1">
-                    1. Escolha a tarefa dele p/ você fazer:
+                  <label className="block text-[9px] text-[#2D2060] font-bold mb-1 uppercase">
+                    1. Qual tarefa do {partnerObj.nome} você assume fazer?
                   </label>
                   <select
                     required
                     value={selectedTaskId}
                     onChange={(e) => setSelectedTaskId(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
+                    className="w-full bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
                   >
-                    <option value="">-- Selecione uma Tarefa dele --</option>
+                    <option value="">-- Selecione uma obrigação dele --</option>
                     {partnerIncompleteTasks.map((t) => (
                       <option key={t.id} value={t.id}>
-                        [{t.dayOfWeek}] {t.title} (+{t.xpValue} XP)
+                        [{t.dia}] {t.titulo} (+{t.xp} XP)
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] text-[#2D2060] font-bold mb-1">
-                    2. Oferta: Qual recompensa sua você deseja liberar:
+                  <label className="block text-[9px] text-[#2D2060] font-bold mb-1 uppercase">
+                    2. Em troca, o que você quer receber do parceiro como carinho?
                   </label>
-                  <select
+                  <input
+                    type="text"
                     required
-                    value={selectedRewardId}
-                    onChange={(e) => setSelectedRewardId(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
-                  >
-                    <option value="">-- Selecione uma Recompensa requisitada --</option>
-                    {myRewards.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.title} ({r.xpRequired} XP)
-                      </option>
-                    ))}
-                  </select>
+                    maxLength={100}
+                    placeholder="Ex: Fazer janta deliciosa para mim, Cafuné ininterrupto de 20min..."
+                    value={swapOfferedReward}
+                    onChange={(e) => setSwapOfferedReward(e.target.value)}
+                    className="w-full bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-xs text-gray outline-none focus:border-[#7C6AF7]"
+                  />
                 </div>
-              </div>
-            )}
 
-            {partnerIncompleteTasks.length > 0 && (
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  disabled={!selectedTaskId || !selectedRewardId}
-                  className="bg-[#2D2060] text-white hover:bg-[#2D2060]/90 rounded-xl py-2 px-5 font-bold text-xs transition disabled:opacity-50"
-                >
-                  Confirmar Proposta 🔥
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowProposeTrade(false)}
-                  className="text-xs text-gray-400 hover:text-gray-600 px-3"
-                >
-                  Cancelar
-                </button>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-[#7C6AF7] hover:bg-[#7C6AF7]/95 text-white font-bold text-xs py-2 rounded-xl transition"
+                  >
+                    Enviar Proposta Oficial 💌
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowProposeTrade(false)}
+                    className="border border-[#E5E7EB] py-2 px-3 text-xs rounded-xl"
+                  >
+                    Voltar
+                  </button>
+                </div>
               </div>
             )}
           </form>
         )}
 
-        {/* Incoming / Outgoing Proposals displays */}
-        <div className="space-y-2">
-          
-          {/* Incoming proposals from counterpart */}
+        {/* Dynamic Lists of incoming proposals and negotiations */}
+        <div className="space-y-2.5">
+          {/* Incoming items from spouse */}
           {incomingProposals.map((prop) => {
-            const proposerName = prop.proposerId === "karina-id" ? "Karina" : "Yuri";
-            const task = tasks.find((t) => t.id === prop.taskId);
-            const reward = rewards.find((r) => r.id === prop.rewardId);
+            const propName = prop.proponenteId === "karina-id" ? "Karina" : "Yuri";
+            const task = tarefas.find((t) => t.id === prop.tarefaId);
 
             return (
-              <div key={prop.id} className="p-4 bg-pink-50/50 border border-pink-100 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-4 animate-pulse">
-                <div className="space-y-1">
-                  <span className="text-[9px] bg-pink-100 text-pink-500 rounded px-1.5 py-0.5 font-bold">PROPOSTA RECEBIDA</span>
-                  <p className="text-xs text-gray-700">
-                    <b>{proposerName}</b> oferece assumir sua tarefa <b>"{task?.title || 'Fazer Chores'}"</b> se você aceitar liberar o desejo dele: <b>"{reward?.title || 'Recompensa'}"</b>.
+              <div key={prop.id} className="p-3.5 bg-pink-50/40 border border-[#F9A8C9]/30 rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                <div className="space-y-0.5">
+                  <span className="inline-block bg-[#F76A8C] text-[8px] text-white py-0.5 px-1.5 rounded uppercase font-bold tracking-wider">
+                    Proposta de {propName}
+                  </span>
+                  <p className="text-xs text-[#2D2060] leading-relaxed">
+                    Oferece assumir sua tarefa <b className="text-[#2D2060]">"{task?.titulo}"</b> se você aceitar de bom grado: <b>"{prop.recompensaOffered || prop.recompensaOferecida}"</b>.
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <button
-                    onClick={() => respondToTrade(prop.id, true)}
-                    className="bg-emerald-500 hover:bg-emerald-600 text-white p-2 rounded-xl text-xs font-bold flex items-center gap-1 transition"
+                    onClick={() => respondToTrade(prop.id, "aceita")}
+                    className="bg-emerald-500 hover:bg-emerald-650 text-white rounded-lg px-3 py-1.5 text-xs font-bold flex items-center gap-1 transition"
                   >
-                    <Check className="w-3.5 h-3.5" /> Aceitar
+                    ✓ Aceitar
                   </button>
                   <button
-                    onClick={() => respondToTrade(prop.id, false)}
-                    className="bg-red-50 hover:bg-red-100 text-red-500 p-2 rounded-xl text-xs font-bold transition"
+                    onClick={() => respondToTrade(prop.id, "recusada")}
+                    className="bg-red-50 hover:bg-red-100 text-red-500 rounded-lg py-1.5 px-3 text-xs font-semibold transition"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    Recusar
                   </button>
                 </div>
               </div>
             );
           })}
 
-          {/* Outgoing proposals awaiting partner approval */}
-          {outgoingProposals.map((prop) => {
-            const task = tasks.find((t) => t.id === prop.taskId);
-            const reward = rewards.find((r) => r.id === prop.rewardId);
-
+          {/* Outgoing proposals status tracker */}
+          {outgoingProposals.map((p) => {
+            const task = tarefas.find((t) => t.id === p.tarefaId);
             return (
-              <div key={prop.id} className="p-3 bg-gray-50 border border-gray-250 border-dashed rounded-2xl flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-[8px] bg-[#FAF7FF] border border-gray-150 text-gray-450 px-1.5 py-0.5 rounded font-bold font-mono uppercase">Enviado</span>
-                  <p className="text-[11px] text-gray-450">
-                    Aguardando {partnerObj.displayName} aceitar trocar <b>"{task?.title}"</b> pela recompensa <b>"{reward?.title}"</b>.
-                  </p>
-                </div>
+              <div key={p.id} className="p-3 bg-gray-50 border border-gray-150 border-dashed rounded-xl flex items-center justify-between">
+                <p className="text-[11px] text-gray">
+                  Aguardando aceitação de {partnerObj.nome} para assumir <b>"{task?.titulo || 'Tarefa'}"</b> em troca de: <i>"{p.recompensaOferecida}"</i>.
+                </p>
+                <span className="text-[9px] bg-yellow-50 text-yellow-600 px-2 py-0.5 font-bold rounded">Pendente</span>
               </div>
             );
           })}
 
           {incomingProposals.length === 0 && outgoingProposals.length === 0 && (
-            <p className="text-[10px] text-gray-450 italic text-center py-2 bg-gray-50/50 rounded-xl">
-              Nenhuma negociação em aberto no momento. Tudo em paz doméstica! 😄
+            <p className="text-center font-mono text-[10px] text-gray italic bg-gray-50/40 py-2 rounded-xl">
+              Nenhuma negociação em aberto no momento. Entendimento pleno! 😄
             </p>
           )}
-
         </div>
-
       </div>
 
-      {/* POOLS OF CUSTOM DESIRES AND REWARDS */}
-      <div className="space-y-4" id="rewards_pool_workspace">
-        
+      {/* 🎁 MIMOS CONFIGURANDO (Custom Wish pools) */}
+      <div className="space-y-4" id="custom_desires_workbench">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-serif font-bold text-2xl text-[#2D2060]">
-              Mimos Configuráveis 🎁
+            <h3 className="font-serif font-bold text-xl text-[#2D2060]">
+              Cofre de Miminhos do Casal 🎁
             </h3>
-            <p className="text-xs text-gray-550">
-              Cadastre desejos que estimulam o carinho e o espírito esportivo.
-            </p>
+            <p className="text-xs text-gray">Crie prêmios simbólicos e dote-os de valor no simulador</p>
           </div>
           <button
             onClick={() => setShowAddReward(!showAddReward)}
-            className="bg-[#7C6AF7] hover:bg-[#7C6AF7]/90 text-white text-xs font-bold rounded-xl px-4 py-2 transition flex items-center gap-1"
+            className="bg-[#7C6AF7] hover:bg-[#7C6AF7]/95 text-white font-bold text-xs py-2 px-3.5 rounded-xl flex items-center gap-1 transition shadow-sm cursor-pointer"
           >
-            <Plus className="w-3.5 h-3.5" />
-            Novo Desejo
+            <Plus className="w-3.5 h-3.5" /> Adicionar Desejo
           </button>
         </div>
 
-        {/* Add custom reward form overlay / expandable */}
+        {/* Add customized wish expandable form */}
         {showAddReward && (
           <form onSubmit={handleCreateReward} className="p-4 bg-[#FAF7FF] border border-[#F0EBFF] rounded-2xl space-y-3">
-            <h4 className="text-xs font-extrabold text-[#2D2060] uppercase tracking-wider">Novo Mimo</h4>
+            <h4 className="text-xs font-bold text-[#2D2060] tracking-wider uppercase">Cadastrar Novo Mimo Afetivo</h4>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Título do Mimo</label>
+                <label className="block text-[9px] text-gray font-bold mb-0.5 uppercase">Título do Carinho</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ex: Massagem de 30min, Isenção da Louça por 2 dias"
+                  placeholder="Ex: Jantar à luz de velas, Fazer cafuné de 20min..."
                   value={newRewardTitle}
                   onChange={(e) => setNewRewardTitle(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
+                  className="w-full bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-500 mb-1">Custo em XP p/ desbloquear</label>
+                <label className="block text-[9px] text-gray font-bold mb-0.5 uppercase">Custo em Pontos (XP)</label>
                 <input
                   type="number"
                   min="50"
-                  max="500"
+                  max="1000"
                   value={newRewardXp}
                   onChange={(e) => setNewRewardXp(Number(e.target.value))}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 outline-none"
+                  className="w-full bg-white border border-[#E5E7EB] rounded-xl px-3 py-2 text-xs text-[#2D2060] outline-none"
                 />
               </div>
             </div>
@@ -306,73 +286,74 @@ export default function RecompensasTab() {
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                className="bg-[#F76A8C] text-white hover:bg-[#F76A8C]/90 rounded-xl py-2 px-5 font-bold text-xs transition"
+                className="bg-[#F76A8C] text-white hover:bg-[#F76A8C]/95 rounded-xl py-2 px-4 text-xs font-bold transition shadow-sm cursor-pointer"
               >
-                Cadastrar Desejo ⭐️
+                Ativar Desejo ✨
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddReward(false)}
-                className="text-xs text-gray-400 hover:text-gray-600 px-3"
+                className="text-xs text-gray hover:text-gray-600 px-3 cursor-pointer"
               >
-                Cancelar
+                Voltar
               </button>
             </div>
           </form>
         )}
 
-        {/* Display grids split: MY DESIRES vs PARTNER DESIRES */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           
-          {/* My desires */}
+          {/* Seus Desejos */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-pink-600 uppercase tracking-widest border-b border-pink-100 pb-1 flex items-center justify-between">
-              <span>Seus Desejos Disponíveis</span>
-              <span className="text-[10px] lowercase font-normal text-gray-400">configurados por você</span>
+            <h4 className="text-xs font-bold text-[#F76A8C] uppercase tracking-widest border-b border-[#F9A8C9]/30 pb-1.5 flex justify-between">
+              <span>Seus Desejos Cadastrados</span>
+              <span className="text-[9px] lowercase font-normal text-gray">Ativos</span>
             </h4>
 
             {myRewards.length === 0 ? (
-              <p className="text-xs p-4 text-center bg-gray-50 rounded-2xl border text-gray-400 italic">Cadastre desejos para incentivá-lo a cooperar!</p>
+              <p className="text-xs p-5 bg-gray-50/50 rounded-2xl border text-center text-gray italic">
+                Você não tem desejos ativos. Crie um para inspirar o parceiro! 🌸
+              </p>
             ) : (
               myRewards.map((reward) => {
-                const isAffordable = userObj.xp >= reward.xpRequired;
-                
+                const affordable = userObj.xpIndividual >= reward.custoXP;
+                const progressPct = Math.min(100, Math.round((userObj.xpIndividual / reward.custoXP) * 100));
+
                 return (
-                  <div key={reward.id} className="p-4 bg-white border border-[#F0EBFF] hover:border-pink-100 rounded-2xl space-y-3.5 relative shadow-2xs">
+                  <div key={reward.id} className="p-4 bg-white border border-[#F0EBFF] hover:border-pink-100 rounded-2xl space-y-3 shadow-xs">
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <h5 className="font-serif font-bold text-md text-[#2D2060]">
+                        <h5 className="font-serif font-bold text-base text-[#2D2060]">
                           {reward.title}
                         </h5>
-                        <p className="text-[10px] text-pink-500 font-mono font-bold uppercase mt-0.5">
-                          Custo: {reward.xpRequired} XP
+                        <p className="text-[10px] text-[#F76A8C] font-mono font-bold uppercase mt-0.5">
+                          CUSTO: {reward.custoXP} XP
                         </p>
                       </div>
 
                       <button
                         onClick={() => redeemReward(reward.id)}
-                        disabled={!isAffordable}
-                        className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition ${
-                          isAffordable
-                            ? "bg-[#7C6AF7] hover:bg-[#7C6AF7]/95 text-white shadow-xs"
-                            : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        disabled={!affordable}
+                        className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition cursor-pointer ${
+                          affordable
+                            ? "bg-[#7C6AF7] hover:bg-[#7C6AF7]/95 text-white"
+                            : "bg-gray-100 text-gray cursor-not-allowed"
                         }`}
                       >
                         Resgatar
                       </button>
                     </div>
 
-                    {/* Progress slider bar towards reward */}
                     <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-1 inline-flex overflow-hidden">
+                      <div className="w-full bg-[#FAF7FF] border border-[#F0EBFF] rounded-full h-1.5 overflow-hidden">
                         <div
                           className="bg-[#7C6AF7] h-1.5 rounded-full"
-                          style={{ width: `${Math.min(100, (userObj.xp / reward.xpRequired) * 100)}%` }}
+                          style={{ width: `${progressPct}%` }}
                         ></div>
                       </div>
-                      <div className="flex justify-between text-[8px] text-gray-400">
-                        <span>XP Atual: {userObj.xp}</span>
-                        <span>Progresso: {Math.round(Math.min(100, (userObj.xp / reward.xpRequired) * 100))}%</span>
+                      <div className="flex justify-between text-[8px] font-bold text-gray uppercase">
+                        <span>XP: {userObj.xpIndividual} / {reward.custoXP}</span>
+                        <span>Progresso: {progressPct}%</span>
                       </div>
                     </div>
                   </div>
@@ -381,50 +362,53 @@ export default function RecompensasTab() {
             )}
           </div>
 
-          {/* Partner wishes */}
+          {/* Desejos do Parceiro */}
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-purple-600 uppercase tracking-widest border-b border-purple-100 pb-1 flex items-center justify-between">
-              <span>Desejos do Parceiro</span>
-              <span className="text-[10px] lowercase font-normal text-gray-400">desbloqueia se ele conquistar</span>
+            <h4 className="text-xs font-bold text-[#7C6AF7] uppercase tracking-widest border-b border-[#F0EBFF] pb-1.5 flex justify-between">
+              <span>Desejos do {partnerObj.nome}</span>
+              <span className="text-[9px] lowercase font-normal text-gray">Em andamento</span>
             </h4>
 
             {partnerRewards.length === 0 ? (
-              <p className="text-xs p-4 text-center bg-gray-50 rounded-2xl border text-gray-400 italic">O parceiro ainda não cadastrou nenhum mimo.</p>
+              <p className="text-xs p-5 bg-gray-50/50 rounded-2xl border text-center text-gray italic">
+                {partnerObj.nome} ainda não cadastrou mimos.
+              </p>
             ) : (
               partnerRewards.map((reward) => {
-                const partnerAffordable = partnerObj.xp >= reward.xpRequired;
-                
+                const partnerAffordable = partnerObj.xpIndividual >= reward.custoXP;
+                const partnerProgress = Math.min(100, Math.round((partnerObj.xpIndividual / reward.custoXP) * 100));
+
                 return (
-                  <div key={reward.id} className="p-4 bg-[#FAF7FF]/50 border border-gray-150/60 rounded-2xl space-y-3 relative">
+                  <div key={reward.id} className="p-4 bg-[#FAF7FF]/50 border border-[#F0EBFF] rounded-2xl space-y-3">
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <h5 className="font-sans font-medium text-xs text-gray-500">
+                        <h5 className="font-serif font-bold text-base text-[#2D2060] opacity-80">
                           {reward.title}
                         </h5>
-                        <p className="text-[9px] text-purple-500 font-bold uppercase">
-                          Custo: {reward.xpRequired} XP
+                        <p className="text-[10px] text-[#7C6AF7] font-mono font-bold mt-0.5">
+                          Custo: {reward.custoXP} XP
                         </p>
                       </div>
 
-                      <span className={`px-2 py-0.5 rounded-lg text-[8px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-bold font-mono tracking-wider ${
                         partnerAffordable
                           ? "bg-emerald-50 text-emerald-500 border border-emerald-100"
-                          : "bg-gray-105 text-gray-450"
+                          : "bg-gray-100 text-gray"
                       }`}>
-                        {partnerAffordable ? "Pode resgatar" : "Falta XP"}
+                        {partnerAffordable ? "PODE SACAR ✓" : "DIFICULDADE"}
                       </span>
                     </div>
 
                     <div className="space-y-1">
-                      <div className="w-full bg-gray-200 rounded-full h-1 inline-flex overflow-hidden">
+                      <div className="w-full bg-white border border-[#F0EBFF] rounded-full h-1.5 overflow-hidden">
                         <div
-                          className="bg-[#7C6AF7] h-1.5 rounded-full opacity-60"
-                          style={{ width: `${Math.min(100, (partnerObj.xp / reward.xpRequired) * 100)}%` }}
+                          className="bg-[#7C6AF7] h-1.5 rounded-full opacity-65"
+                          style={{ width: `${partnerProgress}%` }}
                         ></div>
                       </div>
-                      <div className="flex justify-between text-[8px] text-gray-400">
-                        <span>XP de {partnerObj.displayName}: {partnerObj.xp}</span>
-                        <span>Meta: {reward.xpRequired} XP</span>
+                      <div className="flex justify-between text-[8px] text-gray uppercase font-semibold">
+                        <span>XP dele: {partnerObj.xpIndividual} / {reward.custoXP}</span>
+                        <span>Progresso: {partnerProgress}%</span>
                       </div>
                     </div>
                   </div>
@@ -434,7 +418,6 @@ export default function RecompensasTab() {
           </div>
 
         </div>
-
       </div>
 
     </div>

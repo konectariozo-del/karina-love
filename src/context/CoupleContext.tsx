@@ -5,190 +5,345 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import {
-  HomeState,
-  UserState,
-  TaskState,
+  DiaSemana,
+  CategoriaTarefa,
+  CasalState,
+  UsuarioState,
+  TarefaState,
   RitualState,
-  RewardState,
-  ProposalState,
+  RecompensaState,
+  TrocaState,
   CoupleAppState,
-  DayOfWeek,
-  TaskCategory,
 } from "../types";
+import {
+  db,
+  auth,
+  isFirebaseFallback,
+  handleFirestoreError,
+  OperationType,
+} from "../lib/firebase";
+import {
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  collection,
+  onSnapshot,
+  getDocs,
+  deleteDoc,
+  Timestamp,
+} from "firebase/firestore";
 
-// Setup some initial seed data matching Yuri (Creator) and Karina (Wife)
-const INITIAL_HOME: HomeState = {
-  id: "home-888",
-  partnerAId: "karina-id", // Ela
-  partnerBId: "yuri-id", // Ele
-  streak: 5, // active streak!
-  lastActiveDate: "2026-05-24",
-  terrainLevel: 2,
-  terrainXp: 380, // out of 500 for level 3
-  createdAt: new Date().toISOString(),
+// Mock preset seeding data in Portuguese as requested (for local sandbox/simulator and offline setups)
+const PRESET_CASAL: CasalState = {
+  id: "casal-yuri-karina",
+  nome: "Nossa Constelação de Amor 🌌",
+  criadoEm: "2026-05-20T12:00:00Z",
+  streakAtual: 6,
+  streakUltimaData: "2026-05-24T20:00:00Z",
+  xpCasal: 380,
+  nivelTerreno: 2
 };
 
-const INITIAL_USERS: { ela: UserState; ele: UserState } = {
+const PRESET_USUARIOS: { ela: UsuarioState; ele: UsuarioState } = {
   ela: {
     id: "karina-id",
-    homeId: "home-888",
-    role: "ela",
-    displayName: "Karina",
-    avatarId: "avatar-fada", // Garden Fairy Look
-    xp: 220,
-    badge: "Estrela do Jardim ✨",
-    streakBonus: 5,
-    createdAt: new Date().toISOString(),
+    nome: "Karina",
+    papel: "ela",
+    xpIndividual: 220,
+    avatar: "🧚‍♀️",
+    badges: ["Fada do Jardim Ativa 🌸", "Estrela Radiante ✨"]
   },
   ele: {
     id: "yuri-id",
-    homeId: "home-888",
-    role: "ele",
-    displayName: "Yuri",
-    avatarId: "avatar-gamer", // Neon Gamer Look
-    xp: 160,
-    badge: "Mestre da Louça 🍳",
-    streakBonus: 4,
-    createdAt: new Date().toISOString(),
-  },
+    nome: "Yuri",
+    papel: "ele",
+    xpIndividual: 160,
+    avatar: "🕹️",
+    badges: ["Churrasqueiro Profissional 🥩", "Gamer Estrategista 🎮"]
+  }
 };
 
-const INITIAL_TASKS: TaskState[] = [
-  { id: "task-1", homeId: "home-888", title: "Lavar a louça do jantar", category: "casa", xpValue: 40, assigneeId: "yuri-id", dayOfWeek: "segunda", completed: true, completedAt: "2026-05-25T19:00:00Z" },
-  { id: "task-2", homeId: "home-888", title: "Limpar o filtro do café e balcão", category: "casa", xpValue: 30, assigneeId: "yuri-id", dayOfWeek: "segunda", completed: false },
-  { id: "task-3", homeId: "home-888", title: "Regar a horta do quintal", category: "casa", xpValue: 50, assigneeId: "karina-id", dayOfWeek: "segunda", completed: false },
-  { id: "task-4", homeId: "home-888", title: "Pagar a conta de luz do mês", category: "financeiro", xpValue: 50, assigneeId: "karina-id", dayOfWeek: "terca", completed: false },
-  { id: "task-5", homeId: "home-888", title: "Comprar snacks e vinhos p/ Pipoca", category: "compras", xpValue: 30, assigneeId: "yuri-id", dayOfWeek: "quinta", completed: false },
-  { id: "task-6", homeId: "home-888", title: "Arrumar a cama grande de manhã", category: "casa", xpValue: 20, assigneeId: "karina-id", dayOfWeek: "segunda", completed: true, completedAt: "2026-05-25T08:00:00Z" },
-  { id: "task-7", homeId: "home-888", title: "Separar roupas para lavar", category: "casa", xpValue: 30, assigneeId: "yuri-id", dayOfWeek: "quarta", completed: false },
+const PRESET_TAREFAS: TarefaState[] = [
+  { id: "task-1", titulo: "Lavar a louça do jantar", responsavel: "yuri-id", dia: "Seg", xp: 40, tag: "Casa", concluida: true, concluidaEm: "2026-05-25T19:00:00Z", trocaDisponivel: false },
+  { id: "task-2", titulo: "Limpar o filtro de café e balcão", responsavel: "yuri-id", dia: "Seg", xp: 30, tag: "Casa", concluida: false, concluidaEm: null, trocaDisponivel: true },
+  { id: "task-3", titulo: "Regar camélias do jardim", responsavel: "karina-id", dia: "Seg", xp: 50, tag: "Casa", concluida: false, concluidaEm: null, trocaDisponivel: false },
+  { id: "task-4", titulo: "Ajustar planilhas financeiras", responsavel: "karina-id", dia: "Ter", xp: 50, tag: "Financeiro", concluida: false, concluidaEm: null, trocaDisponivel: true },
+  { id: "task-5", titulo: "Comprar snacks e vinhos do Cinema", responsavel: "yuri-id", dia: "Qui", xp: 35, tag: "Compras", concluida: false, concluidaEm: null, trocaDisponivel: false },
+  { id: "task-6", titulo: "Arrumar a cama grande de manhã", responsavel: "karina-id", dia: "Seg", xp: 20, tag: "Casa", concluida: true, concluidaEm: "2026-05-25T08:00:00Z", trocaDisponivel: false }
 ];
 
-const INITIAL_RITUALS: RitualState[] = [
-  { id: "ritual-1", homeId: "home-888", title: "💆 Massagem relaxante", description: "Um tempo para relaxar os ombros e focar um no outro sem preocupações.", dayOfWeek: "terca", confirmedByA: false, confirmedByB: false },
-  { id: "ritual-2", homeId: "home-888", title: "🍿 Pipoca depois do trabalho", description: "Pipoca quentinha com manteiga e risadas compartilhadas.", dayOfWeek: "quinta", confirmedByA: false, confirmedByB: false },
-  { id: "ritual-3", homeId: "home-888", title: "☕ Café da manhã junto", description: "Colocar a mesa bonita, preparar ovos mexidos e conversar sem pressa.", dayOfWeek: "sabado", confirmedByA: false, confirmedByB: false },
-  { id: "ritual-4", homeId: "home-888", title: "🎬 Noite de filme juntinhos", description: "Luzes apagadas, som alto e um clássico do cinema no sofá.", dayOfWeek: "sexta", confirmedByA: false, confirmedByB: false },
-  { id: "ritual-5", homeId: "home-888", title: "🌙 Conversa sem celular antes de dormir", description: "Perguntar como foi o dia de forma profunda por 10 minutos.", dayOfWeek: "segunda", confirmedByA: false, confirmedByB: false },
+const PRESET_RITUAIS: RitualState[] = [
+  { id: "ritual-1", titulo: "💆 Massagem nos Ombros", descricao: "Um tempo para relaxar o cansaço do trabalho acumulado e focar um no outro sem preocupações.", dia: "Ter", horario: "22:00", xpBonus: 80, confirmacaoEla: false, confirmacaoEle: false, ultimaConfirmacao: null },
+  { id: "ritual-2", titulo: "🍿 Pipoca depois do trabalho", descricao: "Pipoca quentinha com manteiga e risadas assistindo a um filme juntinhos.", dia: "Qui", horario: "21:30", xpBonus: 100, confirmacaoEla: false, confirmacaoEle: false, ultimaConfirmacao: null },
+  { id: "ritual-3", titulo: "☕ Café da manhã com carinho", descricao: "Colocar a mesa de forma charmosa com flores e ovos mexidos no domingo de manhã.", dia: "Dom", horario: "09:30", xpBonus: 120, confirmacaoEla: false, confirmacaoEle: false, ultimaConfirmacao: null },
+  { id: "ritual-4", titulo: "🌙 Diálogo sem pressa", descricao: "Perguntar sobre o sentimento do outro por 10 minutos sem telas antes de dormir.", dia: "Seg", horario: "23:00", xpBonus: 60, confirmacaoEla: false, confirmacaoEle: false, ultimaConfirmacao: null }
 ];
 
-const INITIAL_REWARDS: RewardState[] = [
-  { id: "reward-1", homeId: "home-888", title: "Fazer cafuné de 20 minutos ininterruptos", xpRequired: 150, assigneeId: "karina-id", progress: 80 },
-  { id: "reward-2", homeId: "home-888", title: "Eu escolho o filme + snack preferido hoje", xpRequired: 100, assigneeId: "yuri-id", progress: 60 },
-  { id: "reward-3", homeId: "home-888", title: "Minha janta favorita pedida no iFood", xpRequired: 300, assigneeId: "karina-id", progress: 120 },
-  { id: "reward-4", homeId: "home-888", title: "Uma tarde inteira livre p/ jogar videogame", xpRequired: 250, assigneeId: "yuri-id", progress: 200 },
+const PRESET_RECOMPENSAS: RecompensaState[] = [
+  { id: "reward-1", titulo: "Fazer cafuné de 25 minutos 💆‍♀️", custoXP: 150, configuradaPor: "karina-id", resgatada: false, resgatadaEm: null },
+  { id: "reward-2", titulo: "Pedir minha pizza delivery favorita 🍕", custoXP: 120, configuradaPor: "yuri-id", resgatada: false, resgatadaEm: null },
+  { id: "reward-3", titulo: "Massagem corporal completa com óleo 🌸", custoXP: 300, configuradaPor: "karina-id", resgatada: false, resgatadaEm: null },
+  { id: "reward-4", titulo: "Voucher de 1h livre para videogame 🎮", custoXP: 180, configuradaPor: "yuri-id", resgatada: false, resgatadaEm: null }
 ];
 
-const INITIAL_PROPOSALS: ProposalState[] = [
-  { id: "proposal-1", homeId: "home-888", proposerId: "karina-id", receiverId: "yuri-id", taskId: "task-2", rewardId: "reward-2", status: "pending" },
+const PRESET_TROCAS: TrocaState[] = [
+  { id: "exchange-1", tarefaId: "task-2", proponenteId: "karina-id", recompensaOferecida: "Prometo lavar a louça do almoço amanhã completo 🍳", status: "pendente", contrapropostaTexto: null, criadaEm: "2026-05-25T15:00:00Z" }
 ];
 
 interface CoupleContextType {
   state: CoupleAppState;
   toggleActor: () => void;
   completeTask: (taskId: string) => void;
-  addCustomTask: (title: string, category: TaskCategory, assigneeId: string, dayOfWeek: DayOfWeek, xpValue: number) => void;
-  proposeTrade: (taskId: string, rewardId: string) => void;
-  respondToTrade: (proposalId: string, accept: boolean) => void;
+  addCustomTask: (titulo: string, tag: CategoriaTarefa, responsavel: string, dia: DiaSemana, xp: number) => void;
+  proposeTrade: (tarefaId: string, recompensaOferecida: string) => void;
+  respondToTrade: (trocaId: string, status: "aceita" | "recusada" | "contraproposta", contraTexto?: string | null) => void;
   toggleRitualApproval: (ritualId: string) => void;
-  addCustomReward: (title: string, xpRequired: number, assigneeId: string) => void;
+  addCustomReward: (titulo: string, custoXP: number, configuradaPor: string) => void;
   redeemReward: (rewardId: string) => void;
   buyStars: (starsCount: number) => void;
   unlockCosmetic: (cosmeticId: string, cost: number) => void;
-  unlockedCosmetics: string[];
   activeGardenStyle: string;
   activeGarageStyle: string;
   setCosmeticStyle: (type: "garden" | "garage", styleId: string) => void;
   waterGarden: () => void;
   feedPet: () => void;
   petStatus: "feliz" | "faminto" | "contente";
-  gardenHydration: number; // 0 to 100
+  gardenHydration: number;
   recentActivity: Array<{ id: string; user: string; text: string; time: string; color: string }>;
+  resetDatabaseState: () => void;
 }
 
 const CoupleContext = createContext<CoupleContextType | undefined>(undefined);
 
 export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUserId, setCurrentUserId] = useState<string>("karina-id");
-  const [home, setHome] = useState<HomeState>(INITIAL_HOME);
-  const [users, setUsers] = useState<{ ela: UserState; ele: UserState }>(INITIAL_USERS);
-  const [tasks, setTasks] = useState<TaskState[]>(INITIAL_TASKS);
-  const [rituals, setRituals] = useState<RitualState[]>(INITIAL_RITUALS);
-  const [rewards, setRewards] = useState<RewardState[]>(INITIAL_REWARDS);
-  const [proposals, setProposals] = useState<ProposalState[]>(INITIAL_PROPOSALS);
-  const [stars, setStars] = useState<number>(1500); // Pre-load 1500 Estrelas
+  const [casal, setCasal] = useState<CasalState>(PRESET_CASAL);
+  const [usuarios, setUsuarios] = useState<{ ela: UsuarioState; ele: UsuarioState }>(PRESET_USUARIOS);
+  const [tarefas, setTarefas] = useState<TarefaState[]>(PRESET_TAREFAS);
+  const [rituais, setRituais] = useState<RitualState[]>(PRESET_RITUAIS);
+  const [recompensas, setRecompensas] = useState<RecompensaState[]>(PRESET_RECOMPENSAS);
+  const [trocas, setTrocas] = useState<TrocaState[]>(PRESET_TROCAS);
+  const [stars, setStars] = useState<number>(1500); // Concept currency
   const [unlockedCosmetics, setUnlockedCosmetics] = useState<string[]>(["garden-default", "garage-default"]);
   const [activeGardenStyle, setActiveGardenStyle] = useState<string>("garden-default");
   const [activeGarageStyle, setActiveGarageStyle] = useState<string>("garage-default");
-  
-  // Interactive variables
+
+  // Game/Emotional/Pet attributes
   const [gardenHydration, setGardenHydration] = useState<number>(75);
   const [petStatus, setPetStatus] = useState<"feliz" | "faminto" | "contente">("contente");
   const [recentActivity, setRecentActivity] = useState<Array<{ id: string; user: string; text: string; time: string; color: string }>>([
-    { id: "act-1", user: "Karina", text: "concluiu 'Arrumar a cama grande'", time: "Hoje 08:00", color: "#F76A8C" },
-    { id: "act-2", user: "Yuri", text: "concluiu 'Lavar a louça do jantar'", time: "Hoje 19:00", color: "#7C6AF7" },
+    { id: "act-1", user: "Karina", text: "concluiu 'Arrumar a cama grande' (+20 XP)", time: "Hoje 08:00", color: "#F76A8C" },
+    { id: "act-2", user: "Yuri", text: "concluiu 'Lavar a louça do jantar' (+40 XP)", time: "Ontem 19:00", color: "#7C6AF7" }
   ]);
 
-  // Load from local storage if available
+  // Load from LocalStorage if firebase fallback is true
   useEffect(() => {
-    const saved = localStorage.getItem("karina_love_app_state");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (parsed.currentUserId) setCurrentUserId(parsed.currentUserId);
-        if (parsed.home) setHome(parsed.home);
-        if (parsed.users) setUsers(parsed.users);
-        if (parsed.tasks) setTasks(parsed.tasks);
-        if (parsed.rituals) setRituals(parsed.rituals);
-        if (parsed.rewards) setRewards(parsed.rewards);
-        if (parsed.proposals) setProposals(parsed.proposals);
-        if (parsed.stars !== undefined) setStars(parsed.stars);
-        if (parsed.unlockedCosmetics) setUnlockedCosmetics(parsed.unlockedCosmetics);
-        if (parsed.activeGardenStyle) setActiveGardenStyle(parsed.activeGardenStyle);
-        if (parsed.activeGarageStyle) setActiveGarageStyle(parsed.activeGarageStyle);
-        if (parsed.gardenHydration !== undefined) setGardenHydration(parsed.gardenHydration);
-        if (parsed.petStatus) setPetStatus(parsed.petStatus);
-        if (parsed.recentActivity) setRecentActivity(parsed.recentActivity);
-      } catch (e) {
-        console.error("Erro ao carregar dados do LocalStorage", e);
+    if (isFirebaseFallback) {
+      const saved = localStorage.getItem("karinalove_v2_storage");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.currentUserId) setCurrentUserId(parsed.currentUserId);
+          if (parsed.casal) setCasal(parsed.casal);
+          if (parsed.usuarios) setUsuarios(parsed.usuarios);
+          if (parsed.tarefas) setTarefas(parsed.tarefas);
+          if (parsed.rituais) setRituais(parsed.rituais);
+          if (parsed.recompensas) setRecompensas(parsed.recompensas);
+          if (parsed.trocas) setTrocas(parsed.trocas);
+          if (parsed.stars !== undefined) setStars(parsed.stars);
+          if (parsed.unlockedCosmetics) setUnlockedCosmetics(parsed.unlockedCosmetics);
+          if (parsed.activeGardenStyle) setActiveGardenStyle(parsed.activeGardenStyle);
+          if (parsed.activeGarageStyle) setActiveGarageStyle(parsed.activeGarageStyle);
+          if (parsed.gardenHydration !== undefined) setGardenHydration(parsed.gardenHydration);
+          if (parsed.petStatus) setPetStatus(parsed.petStatus);
+          if (parsed.recentActivity) setRecentActivity(parsed.recentActivity);
+        } catch (e) {
+          console.error("Failed to restore simulated local storage", e);
+        }
       }
     }
   }, []);
 
-  // Save changes to local storage helper
-  const saveState = (
-    newUserId: string,
-    newHome: HomeState,
-    newUsers: typeof users,
-    newTasks: TaskState[],
-    newRituals: RitualState[],
-    newRewards: RewardState[],
-    newProposals: ProposalState[],
-    newStars: number,
-    cosmetics: string[],
-    garden: string,
-    garage: string,
-    hydration: number,
-    pet: "feliz" | "faminto" | "contente",
-    activity: typeof recentActivity
+  // Save to LocalStorage if in simulation
+  const writeSimulatedState = (
+    uId: string,
+    cSal: CasalState,
+    uSers: typeof usuarios,
+    tArs: TarefaState[],
+    rIts: RitualState[],
+    rEcs: RecompensaState[],
+    tRos: TrocaState[],
+    sTrs: number,
+    uCos: string[],
+    gStyle: string,
+    garStyle: string,
+    hYdr: number,
+    pSt: "feliz" | "faminto" | "contente",
+    act: typeof recentActivity
   ) => {
-    localStorage.setItem(
-      "karina_love_app_state",
-      JSON.stringify({
-        currentUserId: newUserId,
-        home: newHome,
-        users: newUsers,
-        tasks: newTasks,
-        rituals: newRituals,
-        rewards: newRewards,
-        proposals: newProposals,
-        stars: newStars,
-        unlockedCosmetics: cosmetics,
-        activeGardenStyle: garden,
-        activeGarageStyle: garage,
-        gardenHydration: hydration,
-        petStatus: pet,
-        recentActivity: activity,
-      })
+    if (isFirebaseFallback) {
+      localStorage.setItem(
+        "karinalove_v2_storage",
+        JSON.stringify({
+          currentUserId: uId,
+          casal: cSal,
+          usuarios: uSers,
+          tarefas: tArs,
+          rituais: rIts,
+          recompensas: rEcs,
+          trocas: tRos,
+          stars: sTrs,
+          unlockedCosmetics: uCos,
+          activeGardenStyle: gStyle,
+          activeGarageStyle: garStyle,
+          gardenHydration: hYdr,
+          petStatus: pSt,
+          recentActivity: act,
+        })
+      );
+    }
+  };
+
+  // Setup Live Real-time Listeners if Firebase is provisioned
+  useEffect(() => {
+    if (!isFirebaseFallback && db) {
+      // Listen to Casal
+      const refCasal = doc(db, "casais", PRESET_CASAL.id);
+      const unsubCasal = onSnapshot(refCasal, (docSnap) => {
+        if (docSnap.exists()) {
+          setCasal({ id: docSnap.id, ...docSnap.data() } as CasalState);
+        } else {
+          // Create preset casal if missing
+          setDoc(refCasal, {
+            nome: PRESET_CASAL.nome,
+            criadoEm: PRESET_CASAL.criadoEm,
+            streakAtual: PRESET_CASAL.streakAtual,
+            streakUltimaData: PRESET_CASAL.streakUltimaData,
+            xpCasal: PRESET_CASAL.xpCasal,
+            nivelTerreno: PRESET_CASAL.nivelTerreno
+          }).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}`));
+        }
+      });
+
+      // Listen to Usuarios
+      const refEla = doc(db, "casais", PRESET_CASAL.id, "usuarios", "karina-id");
+      const refEle = doc(db, "casais", PRESET_CASAL.id, "usuarios", "yuri-id");
+
+      const unsubEla = onSnapshot(refEla, (snap) => {
+        if (snap.exists()) {
+          setUsuarios(prev => ({ ...prev, ela: { id: snap.id, ...snap.data() } as UsuarioState }));
+        } else {
+          setDoc(refEla, PRESET_USUARIOS.ela).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}/usuarios/karina-id`));
+        }
+      });
+
+      const unsubEle = onSnapshot(refEle, (snap) => {
+        if (snap.exists()) {
+          setUsuarios(prev => ({ ...prev, ele: { id: snap.id, ...snap.data() } as UsuarioState }));
+        } else {
+          setDoc(refEle, PRESET_USUARIOS.ele).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}/usuarios/yuri-id`));
+        }
+      });
+
+      // Listen to Subcollections
+      const refTarefas = collection(db, "casais", PRESET_CASAL.id, "tarefas");
+      const unsubTarefas = onSnapshot(refTarefas, (querySnap) => {
+        const loaded: TarefaState[] = [];
+        querySnap.forEach((docSnap) => {
+          loaded.push({ id: docSnap.id, ...docSnap.data() } as TarefaState);
+        });
+        if (loaded.length > 0) {
+          setTarefas(loaded);
+        } else {
+          // Preload tasks to Firestore if empty
+          PRESET_TAREFAS.forEach((t) => {
+            setDoc(doc(db, "casais", PRESET_CASAL.id, "tarefas", t.id), {
+              titulo: t.titulo,
+              responsavel: t.responsavel,
+              dia: t.dia,
+              xp: t.xp,
+              tag: t.tag,
+              concluida: t.concluida,
+              concluidaEm: t.concluidaEm,
+              trocaDisponivel: t.trocaDisponivel
+            }).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}/tarefas/${t.id}`));
+          });
+        }
+      });
+
+      const refRituais = collection(db, "casais", PRESET_CASAL.id, "rituais");
+      const unsubRituais = onSnapshot(refRituais, (querySnap) => {
+        const loaded: RitualState[] = [];
+        querySnap.forEach((docSnap) => {
+          loaded.push({ id: docSnap.id, ...docSnap.data() } as RitualState);
+        });
+        if (loaded.length > 0) {
+          setRituais(loaded);
+        } else {
+          PRESET_RITUAIS.forEach((r) => {
+            setDoc(doc(db, "casais", PRESET_CASAL.id, "rituais", r.id), {
+              titulo: r.titulo,
+              descricao: r.descricao,
+              dia: r.dia,
+              horario: r.horario,
+              xpBonus: r.xpBonus,
+              confirmacaoEla: r.confirmacaoEla,
+              confirmacaoEle: r.confirmacaoEle,
+              ultimaConfirmacao: r.ultimaConfirmacao
+            }).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}/rituais/${r.id}`));
+          });
+        }
+      });
+
+      const refRecompensas = collection(db, "casais", PRESET_CASAL.id, "recompensas");
+      const unsubRecompensas = onSnapshot(refRecompensas, (querySnap) => {
+        const loaded: RecompensaState[] = [];
+        querySnap.forEach((docSnap) => {
+          loaded.push({ id: docSnap.id, ...docSnap.data() } as RecompensaState);
+        });
+        if (loaded.length > 0) {
+          setRecompensas(loaded);
+        } else {
+          PRESET_RECOMPENSAS.forEach((rew) => {
+            setDoc(doc(db, "casais", PRESET_CASAL.id, "recompensas", rew.id), {
+              titulo: rew.titulo,
+              custoXP: rew.custoXP,
+              configuradaPor: rew.configuradaPor,
+              resgatada: rew.resgatada,
+              resgatadaEm: rew.resgatadaEm
+            }).catch(err => handleFirestoreError(err, OperationType.WRITE, `casais/${PRESET_CASAL.id}/recompensas/${rew.id}`));
+          });
+        }
+      });
+
+      const refTrocas = collection(db, "casais", PRESET_CASAL.id, "trocas");
+      const unsubTrocas = onSnapshot(refTrocas, (querySnap) => {
+        const loaded: TrocaState[] = [];
+        querySnap.forEach((docSnap) => {
+          loaded.push({ id: docSnap.id, ...docSnap.data() } as TrocaState);
+        });
+        setTrocas(loaded);
+      });
+
+      return () => {
+        unsubCasal();
+        unsubEla();
+        unsubEle();
+        unsubTarefas();
+        unsubRituais();
+        unsubRecompensas();
+        unsubTrocas();
+      };
+    }
+  }, [isFirebaseFallback]);
+
+  const toggleActor = () => {
+    const nextId = currentUserId === "karina-id" ? "yuri-id" : "karina-id";
+    setCurrentUserId(nextId);
+    writeSimulatedState(
+      nextId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, recentActivity
     );
   };
 
@@ -196,48 +351,20 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return uid === "karina-id" ? "Karina" : "Yuri";
   };
 
-  const logActivity = (user: string, text: string, color: string, currentActList = recentActivity) => {
+  // Logging utility
+  const logActivity = (user: string, text: string, color: string, currentList = recentActivity) => {
     const newAct = {
       id: `act-${Date.now()}`,
       user,
       text,
-      time: "Agora mesmo",
+      time: "Agora",
       color,
     };
-    const updated = [newAct, ...currentActList.slice(0, 15)];
+    const updated = [newAct, ...currentList.slice(0, 15)];
     setRecentActivity(updated);
     return updated;
   };
 
-  // Helper to sync to Firestore if firebase-applet-config exists (silent fallback)
-  const toggleActor = () => {
-    const nextId = currentUserId === "karina-id" ? "yuri-id" : "karina-id";
-    setCurrentUserId(nextId);
-    saveState(
-      nextId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      recentActivity
-    );
-  };
-
-  // Math for Level Projections:
-  // Level thresholds: 
-  // Lvl 1: 0 - 200 XP
-  // Lvl 2: 200 - 500 XP
-  // Lvl 3: 500 - 900 XP
-  // Lvl 4: 900 - 1500 XP
-  // Lvl 5: 1500+ XP
   const getLevelForXp = (xp: number): number => {
     if (xp < 200) return 1;
     if (xp < 500) return 2;
@@ -246,479 +373,447 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return 5;
   };
 
-  const addXpToCouple = (xpAmount: number, targetUserUid: string) => {
-    // 1. Update Home Shared XP and Level
-    const newSharedXp = home.terrainXp + xpAmount;
-    const newLevel = getLevelForXp(newSharedXp);
-    const didLevelUp = newLevel > home.terrainLevel;
-    
-    const updatedHome = {
-      ...home,
-      terrainXp: newSharedXp,
-      terrainLevel: newLevel,
-    };
+  // Adds XP safely across databases or locals
+  const addXpToCouple = (xpAmount: number, userUid: string) => {
+    const isEla = userUid === "karina-id";
+    const roleKey = isEla ? "ela" : "ele";
+    const userToAward = usuarios[roleKey];
 
-    // 2. Update Individual User XP
-    const isUserEla = targetUserUid === "karina-id";
-    const userRoleKey = isUserEla ? "ela" : "ele";
-    const userStateToUpdate = users[userRoleKey];
+    const finalIndividualXp = userToAward.xpIndividual + xpAmount;
+    const finalCasalXp = casal.xpCasal + xpAmount;
+    const finalLevel = getLevelForXp(finalCasalXp);
+    const didLevelUp = finalLevel > casal.nivelTerreno;
 
-    const newIndividualXp = userStateToUpdate.xp + xpAmount;
-    
-    // Auto badges based on XP milestones
-    let dynamicBadge = userStateToUpdate.badge;
-    if (newIndividualXp > 300) {
-      dynamicBadge = isUserEla ? "Imperatriz Celeste ✨👑" : "Lorde da Fortaleza 🛠️🔋";
-    } else if (newIndividualXp > 200) {
-      dynamicBadge = isUserEla ? "Fada do Jardim Ativa 🌸" : "Churrasqueiro Profissional 🥩";
-    } else if (newIndividualXp > 100) {
-      dynamicBadge = isUserEla ? "Apoio de Ouro 🎖️" : "Príncipe das Compras 🛒";
+    // Badges checking
+    let currentBadges = [...userToAward.badges];
+    if (finalIndividualXp > 350 && !currentBadges.includes("Senhor do Lar 🏰")) {
+      currentBadges.push(isEla ? "Rainha Suprema ✨👑" : "Senhor do Lar 🏰");
     }
 
-    const updatedUsers = {
-      ...users,
-      [userRoleKey]: {
-        ...userStateToUpdate,
-        xp: newIndividualXp,
-        badge: dynamicBadge,
-      }
+    const updatedUser: UsuarioState = {
+      ...userToAward,
+      xpIndividual: finalIndividualXp,
+      badges: currentBadges,
     };
 
-    // Trigger hydration & pet boosts on completing tasks
-    const newHydration = Math.min(100, gardenHydration + 15);
-    const newPet: "feliz" | "faminto" | "contente" = "feliz";
+    const updatedCasal: CasalState = {
+      ...casal,
+      xpCasal: finalCasalXp,
+      nivelTerreno: finalLevel,
+    };
 
-    setHome(updatedHome);
-    setUsers(updatedUsers);
-    setGardenHydration(newHydration);
-    setPetStatus(newPet);
+    const updatedUsuarios = {
+      ...usuarios,
+      [roleKey]: updatedUser,
+    };
 
-    let updatedAct = recentActivity;
+    const nextHydration = Math.min(100, gardenHydration + 10);
+    const nextPet: "feliz" | "faminto" | "contente" = "feliz";
+
+    setCasal(updatedCasal);
+    setUsuarios(updatedUsuarios);
+    setGardenHydration(nextHydration);
+    setPetStatus(nextPet);
+
+    let updatedList = recentActivity;
     if (didLevelUp) {
-      updatedAct = logActivity("Sistema ⭐️", `Terreno subiu para o Nível ${newLevel}! ✨`, "#C084FC", updatedAct);
+      updatedList = logActivity("Sistema ⭐️", `Terreno subiu para o Nível ${finalLevel}! 🎉`, "#C084FC", updatedList);
     }
 
-    return { updatedHome, updatedUsers, newHydration, newPet, updatedAct };
+    if (!isFirebaseFallback && db) {
+      const casalRef = doc(db, "casais", PRESET_CASAL.id);
+      updateDoc(casalRef, {
+        xpCasal: finalCasalXp,
+        nivelTerreno: finalLevel
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}`));
+
+      const userRef = doc(db, "casais", PRESET_CASAL.id, "usuarios", userUid);
+      updateDoc(userRef, {
+        xpIndividual: finalIndividualXp,
+        badges: currentBadges
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/usuarios/${userUid}`));
+    }
+
+    return { updatedCasal, updatedUsuarios, nextHydration, nextPet, updatedList };
   };
 
   const completeTask = (taskId: string) => {
-    const updatedTasks = tasks.map((t) => {
+    const taskObj = tarefas.find(t => t.id === taskId);
+    if (!taskObj || taskObj.concluida) return;
+
+    const doerName = getActorName(taskObj.responsavel);
+    const badgeColor = taskObj.responsavel === "karina-id" ? "#F76A8C" : "#7C6AF7";
+
+    const updatedTarefas = tarefas.map(t => {
       if (t.id === taskId) {
-        if (t.completed) return t; // Already completed
-        
-        // Mark checked and trigger XP rewards
-        return {
-          ...t,
-          completed: true,
-          completedAt: new Date().toISOString(),
-        };
+        return { ...t, concluida: true, concluidaEm: new Date().toISOString() };
       }
       return t;
     });
 
-    const targetTask = tasks.find((t) => t.id === taskId);
-    if (!targetTask || targetTask.completed) return;
+    const { updatedCasal, updatedUsuarios, nextHydration, nextPet, updatedList } = addXpToCouple(taskObj.xp, taskObj.responsavel);
 
-    // Award task assignee the XP
-    const { updatedHome, updatedUsers, newHydration, newPet, updatedAct } = addXpToCouple(
-      targetTask.xpValue,
-      targetTask.assigneeId
+    const finalActivity = logActivity(
+      doerName,
+      `concluiu '${taskObj.titulo}' (+${taskObj.xp} XP)`,
+      badgeColor,
+      updatedList
     );
 
-    // Logging
-    const taskDoer = getActorName(targetTask.assigneeId);
-    const color = targetTask.assigneeId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(taskDoer, `concluiu tarefa: '${targetTask.title}' (+${targetTask.xpValue} XP)`, color, updatedAct);
+    setTarefas(updatedTarefas);
 
-    // Filter today's tasks and see if there is active daily combo!
-    // If they completed another task today, counts towards Streak updates
-    setTasks(updatedTasks);
-    saveState(
-      currentUserId,
-      updatedHome,
-      updatedUsers,
-      updatedTasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      newHydration,
-      newPet,
-      finalActivity
-    );
+    if (!isFirebaseFallback && db) {
+      const taskRef = doc(db, "casais", PRESET_CASAL.id, "tarefas", taskId);
+      updateDoc(taskRef, {
+        concluida: true,
+        concluidaEm: new Date().toISOString()
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/tarefas/${taskId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, updatedCasal, updatedUsuarios, updatedTarefas, rituais, recompensas, trocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, nextHydration, nextPet, finalActivity
+      );
+    }
   };
 
   const addCustomTask = (
-    title: string,
-    category: TaskCategory,
-    assigneeId: string,
-    dayOfWeek: DayOfWeek,
-    xpValue: number
+    titulo: string,
+    tag: CategoriaTarefa,
+    responsavel: string,
+    dia: DiaSemana,
+    xp: number
   ) => {
-    const newTask: TaskState = {
-      id: `task-${Date.now()}`,
-      homeId: home.id,
-      title,
-      category,
-      xpValue,
-      assigneeId,
-      dayOfWeek,
-      completed: false,
+    const taskId = `task-${Date.now()}`;
+    const newTask: TarefaState = {
+      id: taskId,
+      titulo,
+      responsavel,
+      dia,
+      xp,
+      tag,
+      concluida: false,
+      concluidaEm: null,
+      trocaDisponivel: true,
     };
 
-    const nextTasks = [...tasks, newTask];
-    setTasks(nextTasks);
+    const nextTarefas = [...tarefas, newTask];
+    setTarefas(nextTarefas);
 
-    const userName = getActorName(currentUserId);
+    const creatorName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `adicionou a tarefa '${title}'`, color);
+    const finalActivity = logActivity(creatorName, `criou tarefa: '${titulo}' para ${getActorName(responsavel)}`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      nextTasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
-    );
-  };
-
-  const proposeTrade = (taskId: string, rewardId: string) => {
-    const task = tasks.find((t) => t.id === taskId);
-    const reward = rewards.find((r) => r.id === rewardId);
-    if (!task || !reward) return;
-
-    // Create a swap proposal
-    const receiverId = task.assigneeId; // Whomever is already holding the task
-    const proposerId = currentUserId;
-
-    if (proposerId === receiverId) {
-      alert("Você não pode propor uma troca por uma tarefa que já é sua!");
-      return;
-    }
-
-    const newProposal: ProposalState = {
-      id: `proposal-${Date.now()}`,
-      homeId: home.id,
-      proposerId,
-      receiverId,
-      taskId,
-      rewardId,
-      status: "pending",
-    };
-
-    const nextProposals = [...proposals, newProposal];
-    setProposals(nextProposals);
-
-    const senderName = getActorName(proposerId);
-    const color = proposerId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(
-      senderName,
-      `propôs trocar '${task.title}' pela recompensa '${reward.title}' 🔄`,
-      color
-    );
-
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      nextProposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
-    );
-  };
-
-  const respondToTrade = (proposalId: string, accept: boolean) => {
-    const proposal = proposals.find((p) => p.id === proposalId);
-    if (!proposal) return;
-
-    const proposalIndex = proposals.findIndex((p) => p.id === proposalId);
-    let nextProposals = [...proposals];
-
-    const responderName = getActorName(currentUserId);
-    const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-
-    if (!accept) {
-      // Marked as declined
-      nextProposals[proposalIndex] = { ...proposal, status: "declined" };
-      setProposals(nextProposals);
-      const finalActivity = logActivity(responderName, `recusou a proposta de troca de tarefa 🔄`, color);
-
-      saveState(
-        currentUserId,
-        home,
-        users,
-        tasks,
-        rituals,
-        rewards,
-        nextProposals,
-        stars,
-        unlockedCosmetics,
-        activeGardenStyle,
-        activeGarageStyle,
-        gardenHydration,
-        petStatus,
-        finalActivity
+    if (!isFirebaseFallback && db) {
+      const taskRef = doc(db, "casais", PRESET_CASAL.id, "tarefas", taskId);
+      setDoc(taskRef, {
+        titulo,
+        responsavel,
+        dia,
+        xp,
+        tag,
+        concluida: false,
+        concluidaEm: null,
+        trocaDisponivel: true
+      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `casais/${PRESET_CASAL.id}/tarefas/${taskId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, casal, usuarios, nextTarefas, rituais, recompensas, trocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
       );
+    }
+  };
+
+  const proposeTrade = (tarefaId: string, recompensaOferecida: string) => {
+    const taskUnit = tarefas.find(t => t.id === tarefaId);
+    if (!taskUnit) return;
+
+    if (taskUnit.responsavel === currentUserId) {
+      alert("A tarefa já está atribuída a você! Escolha uma do parceiro.");
       return;
     }
 
-    // Accept swap:
-    // 1. Swap task assignee to the proposer!
-    const taskIndex = tasks.findIndex((t) => t.id === proposal.taskId);
-    let nextTasks = [...tasks];
-    if (taskIndex !== -1) {
-      nextTasks[taskIndex] = {
-        ...nextTasks[taskIndex],
-        assigneeId: proposal.proposerId, // Proposer takes ownership!
-      };
+    const exchangeId = `troca-${Date.now()}`;
+    const newExchange: TrocaState = {
+      id: exchangeId,
+      tarefaId,
+      proponenteId: currentUserId,
+      recompensaOferecida,
+      status: "pendente",
+      contrapropostaTexto: null,
+      criadaEm: new Date().toISOString()
+    };
+
+    const nextTrocas = [...trocas, newExchange];
+    setTrocas(nextTrocas);
+
+    const matchName = getActorName(currentUserId);
+    const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
+    const finalActivity = logActivity(matchName, `pediu troca de '${taskUnit.titulo}' por: '${recompensaOferecida}' 🔄`, color);
+
+    if (!isFirebaseFallback && db) {
+      const exchangeRef = doc(db, "casais", PRESET_CASAL.id, "trocas", exchangeId);
+      setDoc(exchangeRef, {
+        tarefaId,
+        proponenteId: currentUserId,
+        recompensaOferecida,
+        status: "pendente",
+        contrapropostaTexto: null,
+        criadaEm: new Date().toISOString()
+      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `casais/${PRESET_CASAL.id}/trocas/${exchangeId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, casal, usuarios, tarefas, rituais, recompensas, nextTrocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
+      );
+    }
+  };
+
+  const respondToTrade = (trocaId: string, status: "aceita" | "recusada" | "contraproposta", contraTexto?: string | null) => {
+    const targetExchange = trocas.find(t => t.id === trocaId);
+    if (!targetExchange) return;
+
+    const responder = getActorName(currentUserId);
+    const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
+    let finalAct = recentActivity;
+
+    let nextTarefas = [...tarefas];
+    let nextCasal = casal;
+    let nextUsuarios = usuarios;
+    let finalHydration = gardenHydration;
+
+    if (status === "aceita") {
+      // Execute Swap: reassing Task owner
+      nextTarefas = tarefas.map(t => {
+        if (t.id === targetExchange.tarefaId) {
+          return { ...t, responsavel: targetExchange.proponenteId }; // Swapped!
+        }
+        return t;
+      });
+      setTarefas(nextTarefas);
+
+      // Reward co-op XP (+50 XP)
+      const res = addXpToCouple(50, targetExchange.proponenteId);
+      nextCasal = res.updatedCasal;
+      nextUsuarios = res.updatedUsuarios;
+      finalHydration = res.nextHydration;
+
+      finalAct = logActivity(responder, `aceitou a troca! Assumiu novo carinho de cooperação (+50 XP Casal) 🤝`, color, res.updatedList);
+
+      if (!isFirebaseFallback && db) {
+        // Swap task assignee on DB
+        const taskRef = doc(db, "casais", PRESET_CASAL.id, "tarefas", targetExchange.tarefaId);
+        updateDoc(taskRef, { responsavel: targetExchange.proponenteId })
+          .catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/tarefas/${targetExchange.tarefaId}`));
+      }
+    } else if (status === "recusada") {
+      finalAct = logActivity(responder, `recusou o acordo de troca de tarefas 💔`, color);
+    } else if (status === "contraproposta") {
+      finalAct = logActivity(responder, `enviou contraproposta: "${contraTexto}" 📝`, color);
     }
 
-    // 2. Proposer gains the task, and we feed reward progress or immediate reward completion!
-    // Let's add 50 XP bonus for the successful cooperation as negotiated!
-    const { updatedHome, updatedUsers, newHydration, newPet, updatedAct } = addXpToCouple(50, proposal.proposerId);
+    const updatedTrocas = trocas.map(t => {
+      if (t.id === trocaId) {
+        return { ...t, status, contrapropostaTexto: contraTexto || null };
+      }
+      return t;
+    });
+    setTrocas(updatedTrocas);
 
-    // 3. Status set to accepted
-    nextProposals[proposalIndex] = { ...proposal, status: "accepted" };
-
-    setTasks(nextTasks);
-    setProposals(nextProposals);
-
-    // Log negotiation triumph
-    const originalDoer = getActorName(proposal.receiverId);
-    const taker = getActorName(proposal.proposerId);
-    const finalActivity = logActivity(
-      responderName,
-      `aceitou a troca! ${taker} assumiu a tarefa de ${originalDoer} 🤝 (+50 XP)`,
-      color,
-      updatedAct
-    );
-
-    saveState(
-      currentUserId,
-      updatedHome,
-      updatedUsers,
-      nextTasks,
-      rituals,
-      rewards,
-      nextProposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      newHydration,
-      newPet,
-      finalActivity
-    );
+    if (!isFirebaseFallback && db) {
+      const exchangeRef = doc(db, "casais", PRESET_CASAL.id, "trocas", trocaId);
+      updateDoc(exchangeRef, {
+        status,
+        contrapropostaTexto: contraTexto || null
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/trocas/${trocaId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, nextCasal, nextUsuarios, nextTarefas, rituais, recompensas, updatedTrocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, finalHydration, petStatus, finalAct
+      );
+    }
   };
 
   const toggleRitualApproval = (ritualId: string) => {
-    const originalRituals = [...rituals];
-    const ritualIndex = rituals.findIndex((r) => r.id === ritualId);
-    if (ritualIndex === -1) return;
+    const targetRitual = rituais.find(r => r.id === ritualId);
+    if (!targetRitual) return;
 
-    const r = rituals[ritualIndex];
-    const isUserEla = currentUserId === "karina-id";
+    const isEla = currentUserId === "karina-id";
+    const nextConfEla = isEla ? !targetRitual.confirmacaoEla : targetRitual.confirmacaoEla;
+    const nextConfEle = !isEla ? !targetRitual.confirmacaoEle : targetRitual.confirmacaoEle;
 
-    const nextConfA = isUserEla ? !r.confirmedByA : r.confirmedByA;
-    const nextConfB = !isUserEla ? !r.confirmedByB : r.confirmedByB;
+    const bothApproved = nextConfEla && nextConfEle;
+    const actorName = getActorName(currentUserId);
+    const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
 
-    let bothConfirmed = nextConfA && nextConfB;
-    let xpGranted = 0;
-    
-    let nextHome = { ...home };
-    let nextUsers = { ...users };
-    let finalActivity = recentActivity;
+    let nextCasal = casal;
+    let nextUsuarios = usuarios;
+    let updatedList = recentActivity;
     let nextHydration = gardenHydration;
     let nextPet = petStatus;
 
-    if (bothConfirmed) {
-      // Big celebration! Heart blast! 🌟
-      // Award BOTH partner 100 XP collective boost
-      const resultA = addXpToCouple(100, home.partnerAId);
-      // Take the new values and add to the next partner to aggregate XP correctly
-      
-      const newSharedXp = resultA.updatedHome.terrainXp + 100;
-      const newLevel = getLevelForXp(newSharedXp);
-      const didLevelUp = newLevel > resultA.updatedHome.terrainLevel;
-      
-      nextHome = {
-        ...resultA.updatedHome,
-        terrainXp: newSharedXp,
-        terrainLevel: newLevel,
-        streak: resultA.updatedHome.streak + 1, // Extend collective streak!
+    if (bothApproved) {
+      // Dual Complete! Award massive co-op XP
+      const resA = addXpToCouple(80, "karina-id");
+      const resB = addXpToCouple(80, "yuri-id");
+
+      const finalXp = casal.xpCasal + 160;
+      const finalLvl = getLevelForXp(finalXp);
+
+      nextCasal = {
+        ...casal,
+        xpCasal: finalXp,
+        nivelTerreno: finalLvl,
+        streakAtual: casal.streakAtual + 1,
+        streakUltimaData: new Date().toISOString()
       };
 
-      nextUsers = {
-        ela: {
-          ...resultA.updatedUsers.ela,
-          xp: resultA.updatedUsers.ela.xp + (home.partnerAId === "karina-id" ? 0 : 100),
-        },
-        ele: {
-          ...resultA.updatedUsers.ele,
-          xp: resultA.updatedUsers.ele.xp + (home.partnerBId === "yuri-id" ? 100 : 0),
-        },
+      nextUsuarios = {
+        ela: { ...usuarios.ela, xpIndividual: usuarios.ela.xpIndividual + 80 },
+        ele: { ...usuarios.ele, xpIndividual: usuarios.ele.xpIndividual + 80 },
       };
 
-      nextHydration = 100; // Flourish garden fully
+      nextHydration = 100;
       nextPet = "feliz";
 
-      const actorName = getActorName(currentUserId);
-      const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-      finalActivity = logActivity(
+      updatedList = logActivity(
         "Ritual 💞",
-        `Ambos confirmaram '${r.title}'! Conexão expandida e streak aumentou! (+100 XP individual/casal)`,
+        `Ambos validaram '${targetRitual.titulo}'! Intimidade expandida e streak subiu (+80 XP individuais/casal) ✨`,
         "#F76A8C",
-        resultA.updatedAct
+        resB.updatedList
       );
+
+      if (!isFirebaseFallback && db) {
+        updateDoc(doc(db, "casais", PRESET_CASAL.id), {
+          xpCasal: finalXp,
+          nivelTerreno: finalLvl,
+          streakAtual: casal.streakAtual + 1,
+          streakUltimaData: new Date().toISOString()
+        }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}`));
+      }
     } else {
-      // Just logged individual partial verification
-      const actorName = getActorName(currentUserId);
-      const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-      const statePhrase = (isUserEla ? !r.confirmedByA : !r.confirmedByB) ? "confirmou" : "desfez confirmação de";
-      finalActivity = logActivity(actorName, `${statePhrase} sua parte no ritual '${r.title}' 🕯️`, color);
+      const actionTxt = (isEla ? !targetRitual.confirmacaoEla : !targetRitual.confirmacaoEle) ? "marcou como feito" : "desfez marcação de";
+      updatedList = logActivity(actorName, `${actionTxt} '${targetRitual.titulo}' 🕯️`, color);
     }
 
-    // Assemble new items
-    const updatedRituals = [...rituals];
-    updatedRituals[ritualIndex] = {
-      ...r,
-      confirmedByA: nextConfA,
-      confirmedByB: nextConfB,
-      lastTriggered: bothConfirmed ? new Date().toISOString() : r.lastTriggered,
-    };
+    const updatedRituais = rituais.map(r => {
+      if (r.id === ritualId) {
+        return {
+          ...r,
+          confirmacaoEla: nextConfEla,
+          confirmacaoEle: nextConfEle,
+          ultimaConfirmacao: bothApproved ? new Date().toISOString() : r.ultimaConfirmacao
+        };
+      }
+      return r;
+    });
+    setRituais(updatedRituais);
 
-    setRituals(updatedRituals);
-    if (bothConfirmed) {
-      setHome(nextHome);
-      setUsers(nextUsers);
-      setGardenHydration(nextHydration);
-      setPetStatus(nextPet);
+    if (!isFirebaseFallback && db) {
+      const ritRef = doc(db, "casais", PRESET_CASAL.id, "rituais", ritualId);
+      updateDoc(ritRef, {
+        confirmacaoEla: nextConfEla,
+        confirmacaoEle: nextConfEle,
+        ultimaConfirmacao: bothApproved ? new Date().toISOString() : targetRitual.ultimaConfirmacao
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/rituais/${ritualId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, nextCasal, nextUsuarios, tarefas, updatedRituais, recompensas, trocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, nextHydration, nextPet, updatedList
+      );
     }
-
-    saveState(
-      currentUserId,
-      bothConfirmed ? nextHome : home,
-      bothConfirmed ? nextUsers : users,
-      tasks,
-      updatedRituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      nextHydration,
-      nextPet,
-      finalActivity
-    );
   };
 
-  const addCustomReward = (title: string, xpRequired: number, assigneeId: string) => {
-    const newReward: RewardState = {
-      id: `reward-${Date.now()}`,
-      homeId: home.id,
-      title,
-      xpRequired,
-      assigneeId,
-      progress: 0,
+  const addCustomReward = (titulo: string, custoXP: number, configuradaPor: string) => {
+    const rewardId = `reward-${Date.now()}`;
+    const newReward: RecompensaState = {
+      id: rewardId,
+      titulo,
+      custoXP,
+      configuradaPor,
+      resgatada: false,
+      resgatadaEm: null,
     };
 
-    const nextRewards = [...rewards, newReward];
-    setRewards(nextRewards);
+    const nextRecompensas = [...recompensas, newReward];
+    setRecompensas(nextRecompensas);
 
-    const userName = getActorName(currentUserId);
+    const matchName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `cadastrou recompensa do desejo: '${title}' (${xpRequired} XP necessário)`, color);
+    const finalActivity = logActivity(matchName, `cadastrou recompensa em desejos: '${titulo}' (Custo: ${custoXP} XP)`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      nextRewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
-    );
+    if (!isFirebaseFallback && db) {
+      setDoc(doc(db, "casais", PRESET_CASAL.id, "recompensas", rewardId), {
+        titulo,
+        custoXP,
+        configuradaPor,
+        resgatada: false,
+        resgatadaEm: null
+      }).catch(err => handleFirestoreError(err, OperationType.CREATE, `casais/${PRESET_CASAL.id}/recompensas/${rewardId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, casal, usuarios, tarefas, rituais, nextRecompensas, trocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
+      );
+    }
   };
 
   const redeemReward = (rewardId: string) => {
-    const reward = rewards.find((r) => r.id === rewardId);
-    if (!reward) return;
+    const targetRew = recompensas.find(r => r.id === rewardId);
+    if (!targetRew) return;
 
-    const userKey = reward.assigneeId === "karina-id" ? "ela" : "ele";
-    const user = users[userKey];
+    // Check if claimant (who is configurePor / or current actor) has enough Individual XP
+    const claimantUid = targetRew.configuradaPor;
+    const roleKey = claimantUid === "karina-id" ? "ela" : "ele";
+    const claimantUser = usuarios[roleKey];
 
-    if (user.xp < reward.xpRequired) {
-      alert(`Você não tem XP suficiente! Faltam ${reward.xpRequired - user.xp} XP.`);
+    if (claimantUser.xpIndividual < targetRew.custoXP) {
+      alert(`XP Individual insuficiente! Você precisa de mais ${targetRew.custoXP - claimantUser.xpIndividual} XP.`);
       return;
     }
 
-    // Fully redeem! Subtract individual XP
-    const updatedUsers = {
-      ...users,
-      [userKey]: {
-        ...user,
-        xp: user.xp - reward.xpRequired,
-      }
+    // Deduct Individual XP
+    const userUpdatedXp = claimantUser.xpIndividual - targetRew.custoXP;
+    const updatedUser = { ...claimantUser, xpIndividual: userUpdatedXp };
+
+    const updatedUsuarios = {
+      ...usuarios,
+      [roleKey]: updatedUser,
     };
 
-    setUsers(updatedUsers);
+    setUsuarios(updatedUsuarios);
 
-    // Filter it out or mark completed
-    const nextRewards = rewards.filter((r) => r.id !== rewardId);
-    setRewards(nextRewards);
+    // Swap status to claimed or remove
+    const nextRecompensas = recompensas.map(r => {
+      if (r.id === rewardId) {
+        return { ...r, resgatada: true, resgatadaEm: new Date().toISOString() };
+      }
+      return r;
+    });
+    setRecompensas(nextRecompensas);
 
-    const userName = getActorName(reward.assigneeId);
-    const color = reward.assigneeId === "karina-id" ? "#F76A8C" : "#7C6AF7";
+    const winner = getActorName(claimantUid);
     const finalActivity = logActivity(
-      "Recompensa 🎁",
-      `${userName} resgatou o prêmio: '${reward.title}'! Promessa cobrada com sucesso!`,
+      "Mimo 🎁",
+      `${winner} resgatou prêmio '${targetRew.titulo}'! Promessa cobrada!`,
       "#C084FC"
     );
 
-    saveState(
-      currentUserId,
-      home,
-      updatedUsers,
-      tasks,
-      rituals,
-      nextRewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
-    );
+    if (!isFirebaseFallback && db) {
+      // Update individual user on database
+      updateDoc(doc(db, "casais", PRESET_CASAL.id, "usuarios", claimantUid), {
+        xpIndividual: userUpdatedXp
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/usuarios/${claimantUid}`));
+
+      updateDoc(doc(db, "casais", PRESET_CASAL.id, "recompensas", rewardId), {
+        resgatada: true,
+        resgatadaEm: new Date().toISOString()
+      }).catch(err => handleFirestoreError(err, OperationType.UPDATE, `casais/${PRESET_CASAL.id}/recompensas/${rewardId}`));
+    } else {
+      writeSimulatedState(
+        currentUserId, casal, updatedUsuarios, tarefas, rituais, nextRecompensas, trocas,
+        stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
+      );
+    }
   };
 
   const buyStars = (starsCount: number) => {
@@ -727,29 +822,17 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const userName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `recarregou ${starsCount} Estrelas Karina! 💎`, color);
+    const finalActivity = logActivity(userName, `recarregou ${starsCount} Estrelas Karina! ✨🛒`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      finalStars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
+    writeSimulatedState(
+      currentUserId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      finalStars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
     );
   };
 
   const unlockCosmetic = (cosmeticId: string, cost: number) => {
     if (stars < cost) {
-      alert("Estrelas insuficientes! Recarregue mais Estrelas do Desejo na Loja.");
+      alert("Estrelas insuficientes! Recarregue Stars na loja.");
       return;
     }
 
@@ -761,119 +844,95 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const userName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `desbloqueou cosmético exclusivo: '${cosmeticId}'! 🛍️`, color);
+    const finalActivity = logActivity(userName, `desbloqueou estilo premium '${cosmeticId}'! 🌠`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      finalStars,
-      nextCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
+    writeSimulatedState(
+      currentUserId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      finalStars, nextCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, petStatus, finalActivity
     );
   };
 
   const setCosmeticStyle = (type: "garden" | "garage", styleId: string) => {
-    if (type === "garden") {
-      setActiveGardenStyle(styleId);
-    } else {
-      setActiveGarageStyle(styleId);
-    }
+    const nextGarden = type === "garden" ? styleId : activeGardenStyle;
+    const nextGarage = type === "garage" ? styleId : activeGarageStyle;
 
-    // Trigger update in activity logs
+    if (type === "garden") setActiveGardenStyle(styleId);
+    else setActiveGarageStyle(styleId);
+
     const userName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
     const labelType = type === "garden" ? "Jardim da Karina" : "Garagem do Yuri";
-    const styleLabel = styleId.includes("spring") ? "Primavera Encantada" : styleId.includes("neon") ? "Cyberpunk Gamer" : styleId.includes("winter") ? "Alpes de Inverno" : "Estilo Clássico";
-    const finalActivity = logActivity(userName, `decorou o terreno (${labelType}) com o estilo: '${styleLabel}' 🏡`, color);
+    const finalActivity = logActivity(userName, `decorou o terreno (${labelType}) com o estilo exclusivo! 🌳`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      type === "garden" ? styleId : activeGardenStyle,
-      type === "garage" ? styleId : activeGarageStyle,
-      gardenHydration,
-      petStatus,
-      finalActivity
+    writeSimulatedState(
+      currentUserId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      stars, unlockedCosmetics, nextGarden, nextGarage, gardenHydration, petStatus, finalActivity
     );
   };
 
   const waterGarden = () => {
-    const nextHydration = Math.min(100, gardenHydration + 25);
+    const nextHydration = Math.min(100, gardenHydration + 20);
     setGardenHydration(nextHydration);
-    
+
     const userName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `regou as flores da horta! 🌸`, color);
+    const finalActivity = logActivity(userName, `regou o jardim do amor! 🌹💧`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      nextHydration,
-      petStatus,
-      finalActivity
+    writeSimulatedState(
+      currentUserId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, nextHydration, petStatus, finalActivity
     );
   };
 
   const feedPet = () => {
     setPetStatus("feliz");
-    
+
     const userName = getActorName(currentUserId);
     const color = currentUserId === "karina-id" ? "#F76A8C" : "#7C6AF7";
-    const finalActivity = logActivity(userName, `alimentou o pet virtual do casal! 🐾`, color);
+    const finalActivity = logActivity(userName, `alimentou o pet virtual do casal (+15% Humor)! 🐾🍎`, color);
 
-    saveState(
-      currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
-      stars,
-      unlockedCosmetics,
-      activeGardenStyle,
-      activeGarageStyle,
-      gardenHydration,
-      "feliz",
-      finalActivity
+    writeSimulatedState(
+      currentUserId, casal, usuarios, tarefas, rituais, recompensas, trocas,
+      stars, unlockedCosmetics, activeGardenStyle, activeGarageStyle, gardenHydration, "feliz", finalActivity
     );
+  };
+
+  const resetDatabaseState = () => {
+    if (confirm("Deseja realmente redefinir o simulador para o estado original?")) {
+      localStorage.removeItem("karinalove_v2_storage");
+      setCasal(PRESET_CASAL);
+      setUsuarios(PRESET_USUARIOS);
+      setTarefas(PRESET_TAREFAS);
+      setRituais(PRESET_RITUAIS);
+      setRecompensas(PRESET_RECOMPENSAS);
+      setTrocas(PRESET_TROCAS);
+      setStars(1500);
+      setUnlockedCosmetics(["garden-default", "garage-default"]);
+      setActiveGardenStyle("garden-default");
+      setActiveGarageStyle("garage-default");
+      setGardenHydration(75);
+      setPetStatus("contente");
+      setRecentActivity([
+        { id: "act-1", user: "Karina", text: "concluiu 'Arrumar a cama grande' (+20 XP)", time: "Hoje 08:00", color: "#F76A8C" },
+        { id: "act-2", user: "Yuri", text: "concluiu 'Lavar a louça do jantar' (+40 XP)", time: "Ontem 19:00", color: "#7C6AF7" }
+      ]);
+      alert("Constelação redefinida!");
+    }
   };
 
   const value: CoupleContextType = {
     state: {
       currentUserId,
-      home,
-      users,
-      tasks,
-      rituals,
-      rewards,
-      proposals,
+      casalId: PRESET_CASAL.id,
+      casal,
+      usuarios,
+      tarefas,
+      rituais,
+      recompensas,
+      trocas,
       stars,
+      unlockedDecorations: unlockedCosmetics,
+      activeDecorationStyle: activeGardenStyle
     },
     toggleActor,
     completeTask,
@@ -885,7 +944,6 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     redeemReward,
     buyStars,
     unlockCosmetic,
-    unlockedCosmetics,
     activeGardenStyle,
     activeGarageStyle,
     setCosmeticStyle,
@@ -894,6 +952,7 @@ export const CoupleProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     petStatus,
     gardenHydration,
     recentActivity,
+    resetDatabaseState
   };
 
   return <CoupleContext.Provider value={value}>{children}</CoupleContext.Provider>;

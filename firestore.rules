@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default catch-all denies everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // A user is a member of the couple if they have a user record under that casalId
+    function isMember(casalId) {
+      return isSignedIn() && exists(/databases/$(database)/documents/casais/$(casalId)/usuarios/$(request.auth.uid));
+    }
+
+    // Schemas & validators
+    function isValidCasal(data) {
+      return data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 100
+        && data.streakAtual is int && data.streakAtual >= 0
+        && data.xpCasal is int && data.xpCasal >= 0
+        && data.nivelTerreno is int && data.nivelTerreno >= 1 && data.nivelTerreno <= 10;
+    }
+
+    function isValidUsuario(data) {
+      return data.nome is string && data.nome.size() >= 2 && data.nome.size() <= 100
+        && (data.papel == 'ela' || data.papel == 'ele')
+        && data.xpIndividual is int && data.xpIndividual >= 0
+        && data.avatar is string && data.avatar.size() <= 128
+        && data.badges is list && data.badges.size() <= 50;
+    }
+
+    function isValidTarefa(data) {
+      return data.titulo is string && data.titulo.size() >= 2 && data.titulo.size() <= 200
+        && data.responsavel is string && data.responsavel.size() <= 128
+        && (data.dia == 'Seg' || data.dia == 'Ter' || data.dia == 'Qua' || data.dia == 'Qui' || data.dia == 'Sex' || data.dia == 'Sab' || data.dia == 'Dom')
+        && data.xp is int && data.xp >= 0 && data.xp <= 500
+        && (data.tag == 'Casa' || data.tag == 'Compras' || data.tag == 'Financeiro' || data.tag == 'Outro')
+        && data.concluida is bool
+        && data.trocaDisponivel is bool;
+    }
+
+    function isValidRitual(data) {
+      return data.titulo is string && data.titulo.size() >= 2 && data.titulo.size() <= 200
+        && data.descricao is string && data.descricao.size() <= 1000
+        && data.dia is string && data.dia.size() <= 100
+        && data.horario is string && data.horario.size() <= 50
+        && data.xpBonus is int && data.xpBonus >= 0 && data.xpBonus <= 1000
+        && data.confirmacaoEla is bool
+        && data.confirmacaoEle is bool;
+    }
+
+    function isValidRecompensa(data) {
+      return data.titulo is string && data.titulo.size() >= 2 && data.titulo.size() <= 200
+        && data.custoXP is int && data.custoXP >= 0 && data.custoXP <= 10000
+        && data.configuradaPor is string && data.configuradaPor.size() <= 128
+        && data.resgatada is bool;
+    }
+
+    function isValidTroca(data) {
+      return data.tarefaId is string && data.tarefaId.size() <= 128
+        && data.proponenteId is string && data.proponenteId.size() <= 128
+        && data.recompensaOferecida is string && data.recompensaOferecida.size() <= 200
+        && (data.status == 'pendente' || data.status == 'aceita' || data.status == 'recusada' || data.status == 'contraproposta')
+        && data.criadaEm != null;
+    }
+
+    // MATCH RULES
+
+    // 1. Casais Collection
+    match /casais/{casalId} {
+      allow get: if isSignedIn() && (isMember(casalId) || exists(/databases/$(database)/documents/casais/$(casalId)/usuarios/$(request.auth.uid)));
+      allow create: if isSignedIn() && isValidCasal(incoming());
+      allow update: if isMember(casalId) && isValidCasal(incoming());
+      allow delete: if false;
+
+      // 2. Usuarios Subcollection
+      match /usuarios/{usuarioId} {
+        allow get, list: if isMember(casalId) || (isSignedIn() && request.auth.uid == usuarioId);
+        allow create: if isSignedIn() && request.auth.uid == usuarioId && isValidUsuario(incoming());
+        allow update: if isMember(casalId) && isValidUsuario(incoming());
+        allow delete: if isSignedIn() && request.auth.uid == usuarioId;
+      }
+
+      // 3. Tarefas Subcollection
+      match /tarefas/{tarefaId} {
+        allow get, list: if isMember(casalId);
+        allow create: if isMember(casalId) && isValidId(tarefaId) && isValidTarefa(incoming());
+        allow update: if isMember(casalId) && isValidTarefa(incoming());
+        allow delete: if isMember(casalId);
+      }
+
+      // 4. Rituais Subcollection
+      match /rituais/{ritualId} {
+        allow get, list: if isMember(casalId);
+        allow create: if isMember(casalId) && isValidId(ritualId) && isValidRitual(incoming());
+        allow update: if isMember(casalId) && isValidRitual(incoming());
+        allow delete: if isMember(casalId);
+      }
+
+      // 5. Recompensas Subcollection
+      match /recompensas/{recompensaId} {
+        allow get, list: if isMember(casalId);
+        allow create: if isMember(casalId) && isValidId(recompensaId) && isValidRecompensa(incoming());
+        allow update: if isMember(casalId) && isValidRecompensa(incoming());
+        allow delete: if isMember(casalId);
+      }
+
+      // 6. Trocas Subcollection
+      match /trocas/{trocaId} {
+        allow get, list: if isMember(casalId);
+        allow create: if isMember(casalId) && isValidId(trocaId) && isValidTroca(incoming());
+        allow update: if isMember(casalId) && isValidTroca(incoming());
+        allow delete: if isMember(casalId);
+      }
+    }
+  }
+}

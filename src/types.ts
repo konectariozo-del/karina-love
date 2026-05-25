@@ -3,88 +3,88 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type DayOfWeek = "segunda" | "terca" | "quarta" | "quinta" | "sexta" | "sabado" | "domingo";
+export type DiaSemana = "Seg" | "Ter" | "Qua" | "Qui" | "Sex" | "Sab" | "Dom";
 
-export type TaskCategory = "casa" | "compras" | "financeiro" | "outro";
+export type CategoriaTarefa = "Casa" | "Compras" | "Financeiro" | "Outro";
 
-export interface HomeState {
-  id: string;
-  partnerAId: string; // Ela
-  partnerBId: string; // Ele
-  streak: number;
-  lastActiveDate: string; // YYYY-MM-DD
-  terrainLevel: number;
-  terrainXp: number;
-  createdAt: string;
+export interface CasalState {
+  id: string; // casalId
+  nome: string;
+  criadoEm: string;
+  streakAtual: number;
+  streakUltimaData: string | null;
+  xpCasal: number;
+  nivelTerreno: number;
 }
 
-export interface UserState {
-  id: string;
-  homeId: string;
-  role: "ela" | "ele";
-  displayName: string;
-  avatarId: string;
+export interface UsuarioState {
+  id: string; // usuarioId ("karina-id" | "yuri-id")
+  nome: string;
+  papel: "ela" | "ele";
+  xpIndividual: number;
+  avatar: string; // Emoji ou ID do avatar
+  badges: string[];
+}
+
+export interface TarefaState {
+  id: string; // tarefaId
+  titulo: string;
+  responsavel: string; // usuarioId
+  dia: DiaSemana;
   xp: number;
-  badge: string;
-  streakBonus: number;
-  createdAt: string;
-}
-
-export interface TaskState {
-  id: string;
-  homeId: string;
-  title: string;
-  category: TaskCategory;
-  xpValue: number;
-  assigneeId: string;
-  dayOfWeek: DayOfWeek;
-  completed: boolean;
-  completedAt?: string;
-  comboCount?: number;
+  tag: CategoriaTarefa;
+  concluida: boolean;
+  concluidaEm: string | null;
+  trocaDisponivel: boolean;
 }
 
 export interface RitualState {
-  id: string;
-  homeId: string;
-  title: string;
-  description: string;
-  dayOfWeek: DayOfWeek;
-  confirmedByA: boolean;
-  confirmedByB: boolean;
-  lastTriggered?: string;
+  id: string; // ritualId
+  titulo: string;
+  descricao: string;
+  dia: string; // ex: "Diário", "Sábado", "Seg-Sex"
+  horario: string; // ex: "22:00"
+  xpBonus: number;
+  confirmacaoEla: boolean;
+  confirmacaoEle: boolean;
+  ultimaConfirmacao: string | null;
 }
 
-export interface RewardState {
-  id: string;
-  homeId: string;
-  title: string;
-  xpRequired: number;
-  assigneeId: string; // the receiver (configured it)
-  progress: number;
+export interface RecompensaState {
+  id: string; // recompensaId
+  titulo: string;
+  custoXP: number;
+  configuradaPor: string; // usuarioId
+  resgatada: boolean;
+  resgatadaEm: string | null;
 }
 
-export type ProposalStatus = "pending" | "accepted" | "declined";
+export type StatusTroca = "pendente" | "aceita" | "recusada" | "contraproposta";
 
-export interface ProposalState {
-  id: string;
-  homeId: string;
-  proposerId: string;
-  receiverId: string;
-  taskId: string;
-  rewardId: string;
-  status: ProposalStatus;
+export interface TrocaState {
+  id: string; // trocaId
+  tarefaId: string;
+  proponenteId: string; // usuarioId (quem pediu a troca)
+  recompensaOferecida: string; // Título da recompensa ou texto livre
+  status: StatusTroca;
+  contrapropostaTexto: string | null;
+  criadaEm: string;
 }
 
+// Global App Integration State
 export interface CoupleAppState {
-  currentUserId: string; // 'yuri-id' or 'karina-id'
-  home: HomeState;
-  users: {
-    ela: UserState;
-    ele: UserState;
+  currentUserId: string; // "karina-id" | "yuri-id"
+  casalId: string; // "test-couple"
+  casal: CasalState;
+  usuarios: {
+    ela: UsuarioState;
+    ele: UsuarioState;
   };
-  tasks: TaskState[];
-  rituals: RitualState[];
-  rewards: RewardState[];
-  proposals: ProposalState[];
-  stars: number; // Estrelas Karina
+  tarefas: TarefaState[];
+  rituais: RitualState[];
+  recompensas: RecompensaState[];
+  trocas: TrocaState[];
+  stars: number; // For virtual currency "Estrelas Karina" (concept of Game design)
+  unlockedDecorations: string[]; // List of IDs for unlocked terrain decorations
+  activeDecorationStyle: string; // "garden-default" etc
 }

@@ -1,125 +1,116 @@
 {
   "entities": {
-    "Home": {
-      "title": "Home",
-      "description": "Represents a shared space (lar) for a couple containing shared XP, level, and streak tracking.",
+    "Casal": {
+      "title": "Casal",
+      "description": "Represents a couple's shared state and visual terrain progress.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "The unique ID of the home." },
-        "partnerAId": { "type": "string", "description": "UID of the first partner (typically She / Ela)." },
-        "partnerBId": { "type": "string", "description": "UID of the second partner (typically He / Ele)." },
-        "streak": { "type": "integer", "description": "Current active daily completion streak for the couple." },
-        "lastActiveDate": { "type": "string", "description": "Yyyy-mm-dd format of the last completed task activity." },
-        "terrainLevel": { "type": "integer", "description": "Current level of the shared virtual ground (1-5+)." },
-        "terrainXp": { "type": "integer", "description": "Total shared XP accumulated for terrain leveling." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of home creation." }
+        "nome": { "type": "string", "description": "Nome identificador do casal" },
+        "criadoEm": { "type": "string", "format": "date-time", "description": "Timestamp de criação" },
+        "streakAtual": { "type": "integer", "description": "Streak de dias consecutivos com tarefas concluídas" },
+        "streakUltimaData": { "type": "string", "format": "date-time", "description": "Timestamp do último incremento de streak" },
+        "xpCasal": { "type": "integer", "description": "XP coletivo acumulado pelo casal" },
+        "nivelTerreno": { "type": "integer", "description": "Nível do terreno ou planeta visual (1-5)" }
       },
-      "required": ["id", "partnerAId", "partnerBId", "streak", "terrainLevel", "terrainXp", "createdAt"]
+      "required": ["nome", "criadoEm", "streakAtual", "xpCasal", "nivelTerreno"]
     },
-    "User": {
-      "title": "User",
-      "description": "Represents an individual user profile containing their personal gamified details.",
+    "Usuario": {
+      "title": "Usuario",
+      "description": "Represents an individual partner within the couple.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "The unique Firebase Auth UID." },
-        "homeId": { "type": "string", "description": "The ID of the couple's shared home." },
-        "role": { "type": "string", "enum": ["ela", "ele"], "description": "Role identification (ela = encouraging/affective, ele = competitive/playful)." },
-        "displayName": { "type": "string", "description": "The user's display name." },
-        "avatarId": { "type": "string", "description": "Identifier for the user's custom-themed progressive avatar." },
-        "xp": { "type": "integer", "description": "Individual XP acquired." },
-        "badge": { "type": "string", "description": "Active displayed badge (e.g., Mestre da Louça)." },
-        "streakBonus": { "type": "integer", "description": "Consecutive days completed bonus tracker." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "User registration timestamp." }
+        "nome": { "type": "string", "description": "Nome do usuário" },
+        "papel": { "type": "string", "enum": ["ela", "ele"], "description": "Papel do usuário no relacionamento" },
+        "xpIndividual": { "type": "integer", "description": "XP acumulado individualmente" },
+        "avatar": { "type": "string", "description": "Código identificador ou emoji do avatar" },
+        "badges": { "type": "array", "description": "Lista de conquistas ou títulos recebidos" }
       },
-      "required": ["id", "homeId", "role", "displayName", "avatarId", "xp", "badge", "createdAt"]
+      "required": ["nome", "papel", "xpIndividual", "avatar", "badges"]
     },
-    "Task": {
-      "title": "Task",
-      "description": "A chore or task organized by weekday, providing XP on completion.",
+    "Tarefa": {
+      "title": "Tarefa",
+      "description": "A weekday task with gamified rewards.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Task unique ID." },
-        "homeId": { "type": "string", "description": "ID of the home this task belongs to." },
-        "title": { "type": "string", "description": "Task description." },
-        "category": { "type": "string", "enum": ["casa", "compras", "financeiro", "outro"], "description": "Task category tag." },
-        "xpValue": { "type": "integer", "description": "XP value gained upon completion." },
-        "assigneeId": { "type": "string", "description": "UID of the assigned partner." },
-        "dayOfWeek": { "type": "string", "enum": ["segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo"], "description": "Assigned day of the week." },
-        "completed": { "type": "boolean", "description": "Completion state." },
-        "completedAt": { "type": "string", "format": "date-time", "description": "Timestamp of completion." }
+        "titulo": { "type": "string", "description": "Título da tarefa doméstica ou afetiva" },
+        "responsavel": { "type": "string", "description": "ID do usuário (ela/ele ou correspondente)" },
+        "dia": { "type": "string", "enum": ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"], "description": "Dia da semana agendado" },
+        "xp": { "type": "integer", "description": "Pontos de XP concedidos ao concluir" },
+        "tag": { "type": "string", "enum": ["Casa", "Compras", "Financeiro", "Outro"], "description": "Categoria da tarefa" },
+        "concluida": { "type": "boolean", "description": "Indica se a tarefa foi finalizada" },
+        "concluidaEm": { "type": "string", "format": "date-time", "description": "Data e hora de conclusão" },
+        "trocaDisponivel": { "type": "boolean", "description": "Indica se esta tarefa está liberada para negociação de trocas" }
       },
-      "required": ["id", "homeId", "title", "category", "xpValue", "assigneeId", "dayOfWeek", "completed"]
+      "required": ["titulo", "responsavel", "dia", "xp", "tag", "concluida", "trocaDisponivel"]
     },
     "Ritual": {
       "title": "Ritual",
-      "description": "An affective ritual requiring dual verification and boosting intimacy score.",
+      "description": "An intimate micro-habit scheduled regularly requiring dual approval.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Ritual unique ID." },
-        "homeId": { "type": "string", "description": "ID of the home." },
-        "title": { "type": "string", "description": "Title of the joint ritual." },
-        "description": { "type": "string", "description": "Cooperative ritual flavor text." },
-        "dayOfWeek": { "type": "string", "description": "Scheduled weekday." },
-        "confirmedByA": { "type": "boolean", "description": "Whether She (A) confirmed completion today." },
-        "confirmedByB": { "type": "boolean", "description": "Whether He (B) confirmed completion today." },
-        "lastTriggered": { "type": "string", "format": "date-time", "description": "Last time both partners confirmed." }
+        "titulo": { "type": "string", "description": "Título do ritual de afeição" },
+        "descricao": { "type": "string", "description": "Descrição do que fazer" },
+        "dia": { "type": "string", "description": "Dia recomendado para o ritual" },
+        "horario": { "type": "string", "description": "Horário recomendado" },
+        "xpBonus": { "type": "integer", "description": "XP ganho pelo casal ao completarem juntos" },
+        "confirmacaoEla": { "type": "boolean", "description": "Confirmação da parceira" },
+        "confirmacaoEle": { "type": "boolean", "description": "Confirmação do parceiro" },
+        "ultimaConfirmacao": { "type": "string", "format": "date-time", "description": "Timestamp da última validação mútua" }
       },
-      "required": ["id", "homeId", "title", "confirmedByA", "confirmedByB"]
+      "required": ["titulo", "descricao", "dia", "horario", "xpBonus", "confirmacaoEla", "confirmacaoEle"]
     },
-    "Reward": {
-      "title": "Reward",
-      "description": "User-configured custom rewards unlocked by collective or individual XP.",
+    "Recompensa": {
+      "title": "Recompensa",
+      "description": "Rewards configurable by one partner and redeemable using individual XP.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Reward unique ID." },
-        "homeId": { "type": "string", "description": "ID of the home." },
-        "title": { "type": "string", "description": "Reward description (e.g. Massagem de 30min, Jantar especial)." },
-        "xpRequired": { "type": "integer", "description": "XP points required to redeem." },
-        "assigneeId": { "type": "string", "description": "UID of the person who configured and receives this reward." },
-        "progress": { "type": "integer", "description": "Current accumulated XP tracking towards individual redemption." }
+        "titulo": { "type": "string", "description": "Descrição do mimo ou privilégio" },
+        "custoXP": { "type": "integer", "description": "Custo em XP individual para resgatar" },
+        "configuradaPor": { "type": "string", "description": "ID do usuário que configurou (ela/ele)" },
+        "resgatada": { "type": "boolean", "description": "Indica se já foi reivindicada" },
+        "resgatadaEm": { "type": "string", "format": "date-time", "description": "Data do resgate" }
       },
-      "required": ["id", "homeId", "title", "xpRequired", "assigneeId", "progress"]
+      "required": ["titulo", "custoXP", "configuradaPor", "resgatada"]
     },
-    "Proposal": {
-      "title": "Proposal",
-      "description": "Negotiated task swap where one partner offers a task for a reward trade.",
+    "Troca": {
+      "title": "Troca",
+      "description": "A negotiation proposal where a task is swapped for a requested favor/reward.",
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Unique proposal identifier." },
-        "homeId": { "type": "string", "description": "ID of the home." },
-        "proposerId": { "type": "string", "description": "UID of partner proposing the trade." },
-        "receiverId": { "type": "string", "description": "UID of partner receiving the trade." },
-        "taskId": { "type": "string", "description": "Task being taken over." },
-        "rewardId": { "type": "string", "description": "Reward offered in swap." },
-        "status": { "type": "string", "enum": ["pending", "accepted", "declined"], "description": "Active negotiation status." }
+        "tarefaId": { "type": "string", "description": "ID da tarefa que o proponente quer passar adiante" },
+        "proponenteId": { "type": "string", "description": "ID do proponente (ela/ele)" },
+        "recompensaOferecida": { "type": "string", "description": "Texto ou título da recompensa ofertada em troca" },
+        "status": { "type": "string", "enum": ["pendente", "aceita", "recusada", "contraproposta"], "description": "Status da negociação" },
+        "contrapropostaTexto": { "type": "string", "description": "Descrição de uma contraproposta se houver" },
+        "criadaEm": { "type": "string", "format": "date-time", "description": "Data de criação da proposta" }
       },
-      "required": ["id", "homeId", "proposerId", "receiverId", "taskId", "rewardId", "status"]
+      "required": ["tarefaId", "proponenteId", "recompensaOferecida", "status", "criadaEm"]
     }
   },
   "firestore": {
-    "/homes/{homeId}": {
-      "schema": "Home",
-      "description": "Root collection for couple's collective data environment."
+    "/casais/{casalId}": {
+      "schema": "Casal",
+      "description": "Dados do casal, incluindo nível do terreno, streak e XP compartilhado."
     },
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "Profiles for both partners mapped individually."
+    "/casais/{casalId}/usuarios/{usuarioId}": {
+      "schema": "Usuario",
+      "description": "Perfis individuais dos parceiros (Karina/Yuri)."
     },
-    "/homes/{homeId}/tasks/{taskId}": {
-      "schema": "Task",
-      "description": "Assigned tasks on the couple's shared schedule."
+    "/casais/{casalId}/tarefas/{tarefaId}": {
+      "schema": "Tarefa",
+      "description": "Tarefas semanais do casal para organizar as obrigações e carinhos."
     },
-    "/homes/{homeId}/rituals/{ritualId}": {
+    "/casais/{casalId}/rituais/{ritualId}": {
       "schema": "Ritual",
-      "description": "Intimate milestones and joint activities scheduled weekly."
+      "description": "Rituais de conexão diários ou semanais com engajamento mútuo."
     },
-    "/homes/{homeId}/rewards/{rewardId}": {
-      "schema": "Reward",
-      "description": "Redeemable milestones representing affective trades."
+    "/casais/{casalId}/recompensas/{recompensaId}": {
+      "schema": "Recompensa",
+      "description": "Recompensas e mimos cadastrados pelos parceiros para resgate via XP."
     },
-    "/homes/{homeId}/proposals/{proposalId}": {
-      "schema": "Proposal",
-      "description": "Active negotiations for trading tasks."
+    "/casais/{casalId}/trocas/{trocaId}": {
+      "schema": "Troca",
+      "description": "Propostas e contrapropostas de troca de tarefas domésticas por mimos."
     }
   }
 }
